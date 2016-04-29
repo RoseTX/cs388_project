@@ -1,0 +1,5 @@
+java -cp "stanford-parser.jar:slf4j-api.jar:" -server -mx1500m edu.stanford.nlp.parser.lexparser.LexicalizedParser -evals "tsv" -goodPCFG -train /projects/nlp/penn-treebank3/parsed/mrg/wsj/ 200-270 -testTreebank /projects/nlp/penn-treebank3/parsed/mrg/wsj/ 2000-2100
+
+French Trainer:
+
+

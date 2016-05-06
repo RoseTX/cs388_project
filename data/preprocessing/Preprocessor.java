@@ -38,8 +38,8 @@ public class Preprocessor {
     }
 
     public static void preprocess_treebank (String data_dir) throws FileNotFoundException, IOException{//synchronously removes empty parentheses lines
-        String french_data = data_dir + "french_train_set_noblanks";
-        String english_data = data_dir + "english_train_set_noblanks";
+        String french_data = data_dir + "french_test_set";
+        String english_data = data_dir + "english_test_set";
 
         BufferedReader french_raw_data = new BufferedReader(new FileReader(french_data));
         BufferedReader english_raw_data = new BufferedReader(new FileReader(english_data));

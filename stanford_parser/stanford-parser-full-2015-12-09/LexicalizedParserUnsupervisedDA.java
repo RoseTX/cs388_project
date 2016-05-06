@@ -1,4 +1,6 @@
 
+import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.HasTag;
 import edu.stanford.nlp.parser.lexparser.BinaryGrammar;
 import edu.stanford.nlp.parser.lexparser.DependencyGrammar;
 import edu.stanford.nlp.parser.lexparser.LexicalizedParser;
@@ -21,6 +23,8 @@ import java.util.function.Function;
 import edu.stanford.nlp.util.Index;
 import edu.stanford.nlp.tagger.io.TaggedFileRecord;
 import edu.stanford.nlp.trees.DiskTreebank;
+import edu.stanford.nlp.trees.MemoryTreebank;
+import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.util.Generics;
 import edu.stanford.nlp.util.Pair;
 import edu.stanford.nlp.util.ReflectionLoading;
@@ -28,47 +32,12 @@ import edu.stanford.nlp.util.StringUtils;
 import edu.stanford.nlp.util.Timing;
 import edu.stanford.nlp.util.Triple;
 import edu.stanford.nlp.util.logging.Redwood;
+import edu.stanford.nlp.ling.Sentence;
 
 import java.io.*;
 import java.util.*;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-
-///////////////////////////////////
-
-import edu.stanford.nlp.io.IOUtils;
-import edu.stanford.nlp.io.NumberRangeFileFilter;
-import edu.stanford.nlp.io.NumberRangesFileFilter;
-import edu.stanford.nlp.io.RuntimeIOException;
-import edu.stanford.nlp.ling.HasWord;
-import edu.stanford.nlp.ling.TaggedWord;
-import edu.stanford.nlp.process.PTBTokenizer;
-import edu.stanford.nlp.process.Tokenizer;
-import edu.stanford.nlp.util.ErasureUtils;
-import edu.stanford.nlp.util.HashIndex;
-import edu.stanford.nlp.util.Index;
-import edu.stanford.nlp.tagger.io.TaggedFileRecord;
-import edu.stanford.nlp.trees.*;
-import edu.stanford.nlp.util.Pair;
-import edu.stanford.nlp.util.ReflectionLoading;
-import edu.stanford.nlp.util.Timing;
-import edu.stanford.nlp.util.Triple;
-
-import java.io.*;
-import java.util.*;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-
-import edu.stanford.nlp.parser.lexparser.MLEDependencyGrammarExtractor;
-import edu.stanford.nlp.parser.lexparser.BinaryGrammarExtractor;
-import edu.stanford.nlp.parser.lexparser.LinearGrammarSmoother;
-import edu.stanford.nlp.parser.lexparser.TreeAnnotatorAndBinarizer;
-import edu.stanford.nlp.parser.lexparser.TreeAnnotator;
-import edu.stanford.nlp.parser.lexparser.ParentAnnotationStats;
 
 /*
  * To change this license header, choose License Headers in Project Properties.
@@ -98,7 +67,7 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
     }
     
     public static void main(String[] args) {
-    boolean train = false;
+    boolean seed = false;
     boolean saveToSerializedFile = false;
     boolean saveToTextFile = false;
     String serializedInputFileOrUrl = null;
@@ -106,9 +75,12 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
     String serializedOutputFileOrUrl = null;
     String textOutputFileOrUrl = null;
     String treebankPath = null;
-    Treebank testTreebank = null;
+    Treebank selfTrainTreebank = null;
+    MemoryTreebank finalTrainTreebank = null;
     Treebank tuneTreebank = null;
     String testPath = null;
+    String inTestPath = null;
+    String selfTrainPath = null;
     FileFilter testFilter = null;
     String tunePath = null;
     FileFilter tuneFilter = null;
@@ -138,10 +110,19 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
     String encoding = null;
     // while loop through option arguments
     while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
-      if (args[argIndex].equalsIgnoreCase("-train") ||
-          args[argIndex].equalsIgnoreCase("-trainTreebank")) {
-        train = true;
-        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
+        if (args[argIndex].equalsIgnoreCase("-inTest")) {
+        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-inTest");
+        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+        inTestPath = treebankDescription.first();
+      }
+        else if (args[argIndex].equalsIgnoreCase("-test")) {
+        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+        testPath = treebankDescription.first();
+      }
+        else if (args[argIndex].equalsIgnoreCase("-seed")) {
+        seed = true;
+        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-seed");
         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
         treebankPath = treebankDescription.first();
         trainFilter = treebankDescription.second();
@@ -232,12 +213,10 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
         // save the training trees to a binary file
         op.trainOptions.trainTreeFile = args[argIndex + 1];
         argIndex += 2;
-      } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
-                 args[argIndex].equalsIgnoreCase("-testTreebank") ||
-                 args[argIndex].equalsIgnoreCase("-test")) {
-        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+      } else if (args[argIndex].equalsIgnoreCase("-selfTrain")) {
+        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-selfTrain");
         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        testPath = treebankDescription.first();
+        selfTrainPath = treebankDescription.first();
         testFilter = treebankDescription.second();
       } else if (args[argIndex].equalsIgnoreCase("-tune")) {
         Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-tune");
@@ -271,7 +250,7 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
 //      StringUtils.logInvocationString(log, args);
 //    }
     LexicalizedParser lp; // always initialized in next if-then-else block
-    if (train) {
+    if (seed) {
       //StringUtils.logInvocationString(log, args);
 
       // so we train a parser using the treebank
@@ -281,6 +260,8 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
       }
 
       Treebank trainTreebank = makeTreebank(treebankPath, op, trainFilter);
+      finalTrainTreebank = new MemoryTreebank();
+      finalTrainTreebank.addAll(trainTreebank);
 
       Treebank secondaryTrainTreebank = null;
       if (secondaryTreebankPath != null) {
@@ -298,6 +279,7 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
         }
       }
 
+      op.testOptions.quietEvaluation = true;
       lp = getParserFromTreebank(trainTreebank, secondaryTrainTreebank, secondaryTreebankWeight, compactor, op, tuneTreebank, extraTaggedWords);
     } else if (textInputFileOrUrl != null) {
       // so we load the parser from a text grammar file
@@ -359,17 +341,17 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
       op.tlpParams.setOutputEncoding(encoding);
     }
 
-    if (testFilter != null || testPath != null) {
-      if (testPath == null) {
+    if (testFilter != null || selfTrainPath != null) {
+      if (selfTrainPath == null) {
         if (treebankPath == null) {
           throw new RuntimeException("No test treebank path specified...");
         } else {
           log.info("No test treebank path specified.  Using train path: \"" + treebankPath + '\"');
-          testPath = treebankPath;
+          selfTrainPath = treebankPath;
         }
       }
-      testTreebank = op.tlpParams.testMemoryTreebank();
-      testTreebank.loadPath(testPath, testFilter);
+      selfTrainTreebank = op.tlpParams.testMemoryTreebank();
+      selfTrainTreebank.loadPath(selfTrainPath, testFilter);
     }
 
     op.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(op.tlpParams.sisterSplitters()));
@@ -390,13 +372,13 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
     if (saveToSerializedFile) {
       if (serializedOutputFileOrUrl != null) {
         lp.saveParserToSerialized(serializedOutputFileOrUrl);
-      } else if (textOutputFileOrUrl == null && testTreebank == null) {
+      } else if (textOutputFileOrUrl == null && selfTrainTreebank == null) {
         // no saving/parsing request has been specified
-        log.info("usage: " + "java edu.stanford.nlp.parser.lexparser.LexicalizedParser " + "-train trainFilesPath [fileRange] -saveToSerializedFile serializedParserFilename");
+        log.info("usage: " + "java edu.stanford.nlp.parser.lexparser.LexicalizedParser " + "-seed trainFilesPath [fileRange] -saveToSerializedFile serializedParserFilename");
       }
     }
 
-    if (op.testOptions.verbose || train) {
+    if (op.testOptions.verbose || seed) {
       // Tell the user a little or a lot about what we have made
       // get lexicon size separately as it may have its own prints in it....
       String lexNumRules = lp.lex != null ? Integer.toString(lp.lex.numRules()): "";
@@ -417,10 +399,38 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
       printOptions(false, op);
     }
 
-    if (testTreebank != null) {
-      // test parser on treebank
-      EvaluateTreebank evaluator = new EvaluateTreebank(lp);
-      evaluator.testOnTreebank(testTreebank);
+    if (selfTrainTreebank != null) {
+        Treebank selfTrainTest = makeTreebank(testPath, op, null);
+        Treebank inTest = makeTreebank(inTestPath, op, null);
+        EvaluateTreebank evaluator = new EvaluateTreebank(lp);
+        double baseLineOutDomain = evaluator.testOnTreebank(selfTrainTest);
+        double baseLineInDomain = evaluator.testOnTreebank(inTest);
+        // annotate unlabeled data
+        System.out.println("Starting selftraining...");
+        int i = 0;
+        for (Tree goldTree : selfTrainTreebank) {
+            List<? extends HasWord> sentence = Sentence.toCoreLabelList(goldTree.yieldWords());;
+            finalTrainTreebank.add(lp.parseTree(sentence));
+            System.out.println("Self-training : " + (++i));
+        }
+        System.out.println("Finished creating the final dataset");
+        GrammarCompactor compactor = null;
+        if (op.trainOptions.compactGrammar() == 3) {
+            compactor = new ExactGrammarCompactor(op, false, false);
+        }
+        op.testOptions.quietEvaluation = true;
+        lp = getParserFromTreebank(finalTrainTreebank, null, 1.0, compactor, op, tuneTreebank, null);
+        
+      evaluator = new EvaluateTreebank(lp);
+      double finalF1 = evaluator.testOnTreebank(selfTrainTest);
+      
+      System.out.println("------------------------");
+      System.out.println("The results that matter:");
+      System.out.println("------------------------");
+      System.out.println("Baseline In Domain F1 : " + baseLineInDomain);
+      System.out.println("Baseline Out Domain F1 : " + baseLineOutDomain);
+      System.out.println("Self-Trained Out Domain F1 : " + finalF1);
+      
     } else if (argIndex >= args.length) {
       // no more arguments, so we just parse our own test sentence
       PrintWriter pwOut = op.tlpParams.pw();
@@ -440,7 +450,7 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
   } // end main
     
     private static Treebank makeTreebank(String treebankPath, Options op, FileFilter filt) {
-    log.info("Training a parser from treebank dir: " + treebankPath);
+    log.info("Making a Treebank from treebank dir: " + treebankPath);
     Treebank trainTreebank = op.tlpParams.diskTreebank();
     log.info("Reading trees...");
     if (filt == null) {
@@ -475,235 +485,4 @@ public class LexicalizedParserUnsupervisedDA extends LexicalizedParser{
     }
     op.tlpParams.display();
   }
-
-  public static LexicalizedParser getParserFromTreebank(Treebank trainTreebank,
-                        Treebank secondaryTrainTreebank,
-                        double weight,
-                        GrammarCompactor compactor,
-                        Options op,
-                        Treebank tuneTreebank,
-                        List<List<TaggedWord>> extraTaggedWords)
-  {
-    System.err.println("Currently " + new Date());
-    printOptions(true, op);
-    Timing.startTime();
-
-    Triple<Treebank, Treebank, Treebank> treebanks = getAnnotatedBinaryTreebankFromTreebank(trainTreebank, secondaryTrainTreebank, tuneTreebank, op);
-
-    Treebank trainTreebankRaw = trainTreebank;
-    trainTreebank = treebanks.first();
-    secondaryTrainTreebank = treebanks.second();
-    tuneTreebank = treebanks.third();
-
-    // +1 to account for the boundary symbol
-    trainTreebank = new FilteringTreebank(trainTreebank, new LengthTreeFilter(op.trainOptions.trainLengthLimit + 1));
-    if (secondaryTrainTreebank != null) {
-      secondaryTrainTreebank = new FilteringTreebank(secondaryTrainTreebank, new LengthTreeFilter(op.trainOptions.trainLengthLimit + 1));
-    }
-    if (tuneTreebank != null) {
-      tuneTreebank = new FilteringTreebank(tuneTreebank, new LengthTreeFilter(op.trainOptions.trainLengthLimit + 1));
-    }
-
-    Index<String> stateIndex;
-    Index<String> wordIndex;
-    Index<String> tagIndex;
-
-    Pair<UnaryGrammar, BinaryGrammar> bgug;
-    Lexicon lex;
-
-    stateIndex = new HashIndex<String>();
-    wordIndex = new HashIndex<String>();
-    tagIndex = new HashIndex<String>();
-    
-    // extract grammars
-    BinaryGrammarExtractor bgExtractor = new BinaryGrammarExtractor(op, stateIndex);
-    // Extractor lexExtractor = new LexiconExtractor();
-    //TreeExtractor uwmExtractor = new UnknownWordModelExtractor(trainTreebank.size());
-    System.err.print("Extracting PCFG...");
-    if (secondaryTrainTreebank == null) {
-      bgug = bgExtractor.extract(trainTreebank);
-    } else {
-      bgug = bgExtractor.extract(trainTreebank, 1.0, 
-                                 secondaryTrainTreebank, weight);
-    }
-    Timing.tick("done.");
-    
-    System.err.print("Extracting Lexicon...");
-    lex = op.tlpParams.lex(op, wordIndex, tagIndex);
-    
-    double trainSize = trainTreebank.size();
-    if (secondaryTrainTreebank != null) {
-      trainSize += (secondaryTrainTreebank.size() * weight);
-    }
-    if (extraTaggedWords != null) {
-      trainSize += extraTaggedWords.size();
-    }
-    
-    lex.initializeTraining(trainSize);
-    // wsg2012: The raw treebank has CoreLabels, which we need for FactoredLexicon
-    // training. If TreeAnnotator is updated so that it produces CoreLabels, then we can
-    // remove the trainTreebankRaw.
-    lex.train(trainTreebank, trainTreebankRaw);
-    if (secondaryTrainTreebank != null) {
-      lex.train(secondaryTrainTreebank, weight);
-    }
-    if (extraTaggedWords != null) {
-      for (List<TaggedWord> sentence : extraTaggedWords) {
-        // TODO: specify a weight?
-        lex.trainUnannotated(sentence, 1.0);
-      }
-    }
-    lex.finishTraining();
-    Timing.tick("done.");
-      
-    //TODO: wsg2011 Not sure if this should come before or after
-    //grammar compaction
-    if (op.trainOptions.ruleSmoothing) {
-      System.err.print("Smoothing PCFG...");
-      Function<Pair<UnaryGrammar,BinaryGrammar>,Pair<UnaryGrammar,BinaryGrammar>> smoother = new LinearGrammarSmoother(op.trainOptions, stateIndex, tagIndex);
-      bgug = smoother.apply(bgug);
-      Timing.tick("done.");
-    }
-
-    if (compactor != null) {
-      System.err.print("Compacting grammar...");
-      Triple<Index<String>, UnaryGrammar, BinaryGrammar> compacted = compactor.compactGrammar(bgug, stateIndex);
-      stateIndex = compacted.first();
-      bgug.setFirst(compacted.second());
-      bgug.setSecond(compacted.third());
-      Timing.tick("done.");
-    }
-
-    System.err.print("Compiling grammar...");
-    BinaryGrammar bg = bgug.second;
-    bg.splitRules();
-    UnaryGrammar ug = bgug.first;
-    ug.purgeRules();
-    Timing.tick("done");
-
-    DependencyGrammar dg = null;
-    if (op.doDep) {
-    }
-
-    System.err.println("Done training parser.");
-    if (op.trainOptions.trainTreeFile!=null) {
-      try {
-        System.err.print("Writing out binary trees to "+ op.trainOptions.trainTreeFile+"...");
-        IOUtils.writeObjectToFile(trainTreebank, op.trainOptions.trainTreeFile);
-        IOUtils.writeObjectToFile(secondaryTrainTreebank, op.trainOptions.trainTreeFile);
-        Timing.tick("done.");
-      } catch (Exception e) {
-        System.err.println("Problem writing out binary trees.");
-      }
-    }
-    return new LexicalizedParser(lex, bg, ug, dg, stateIndex, wordIndex, tagIndex, op);
-  }
-
-  public static Triple<Treebank, Treebank, Treebank> getAnnotatedBinaryTreebankFromTreebank(Treebank trainTreebank,
-      Treebank secondaryTreebank,
-      Treebank tuneTreebank,
-      Options op) {
-    // setup tree transforms
-    TreebankLangParserParams tlpParams = op.tlpParams;
-    TreebankLanguagePack tlp = tlpParams.treebankLanguagePack();
-
-    if (op.testOptions.verbose) {
-      PrintWriter pwErr = tlpParams.pw(System.err);
-      pwErr.print("Training ");
-      pwErr.println(trainTreebank.textualSummary(tlp));
-      if (secondaryTreebank != null) {
-        pwErr.print("Secondary training ");
-        pwErr.println(secondaryTreebank.textualSummary(tlp));
-      }
-    }
-
-    log.info("Binarizing trees...");
-
-    TreeAnnotatorAndBinarizer binarizer = buildTrainBinarizer(op);
-    CompositeTreeTransformer trainTransformer = buildTrainTransformer(op, binarizer);
-
-    Treebank wholeTreebank;
-    if (secondaryTreebank == null) {
-      wholeTreebank = trainTreebank;
-    } else {
-      wholeTreebank = new CompositeTreebank(trainTreebank, secondaryTreebank);
-    }
-
-    if (op.trainOptions.selectiveSplit) {
-      op.trainOptions.splitters = ParentAnnotationStats.getSplitCategories(wholeTreebank, op.trainOptions.tagSelectiveSplit, 0, op.trainOptions.selectiveSplitCutOff, op.trainOptions.tagSelectiveSplitCutOff, tlp);
-      removeDeleteSplittersFromSplitters(tlp, op);
-      if (op.testOptions.verbose) {
-        List<String> list = new ArrayList<>(op.trainOptions.splitters);
-        Collections.sort(list);
-        log.info("Parent split categories: " + list);
-      }
-    }
-
-    if (op.trainOptions.selectivePostSplit) {
-      // Do all the transformations once just to learn selective splits on annotated categories
-      TreeTransformer myTransformer = new TreeAnnotator(tlpParams.headFinder(), tlpParams, op);
-      wholeTreebank = wholeTreebank.transform(myTransformer);
-      op.trainOptions.postSplitters = ParentAnnotationStats.getSplitCategories(wholeTreebank, true, 0, op.trainOptions.selectivePostSplitCutOff, op.trainOptions.tagSelectivePostSplitCutOff, tlp);
-      if (op.testOptions.verbose) {
-        log.info("Parent post annotation split categories: " + op.trainOptions.postSplitters);
-      }
-    }
-    if (op.trainOptions.hSelSplit) {
-      // We run through all the trees once just to gather counts for hSelSplit!
-      int ptt = op.trainOptions.printTreeTransformations;
-      op.trainOptions.printTreeTransformations = 0;
-      binarizer.setDoSelectiveSplit(false);
-      for (Tree tree : wholeTreebank) {
-        log.info(tree.toString());
-        trainTransformer.transformTree(tree);
-      }
-      binarizer.setDoSelectiveSplit(true);
-      op.trainOptions.printTreeTransformations = ptt;
-    }
-    // we've done all the setup now. here's where the train treebank is transformed.
-    trainTreebank = trainTreebank.transform(trainTransformer);
-    if (secondaryTreebank != null) {
-      secondaryTreebank = secondaryTreebank.transform(trainTransformer);
-    }
-    if (op.trainOptions.printAnnotatedStateCounts) {
-      binarizer.printStateCounts();
-    }
-    if (op.trainOptions.printAnnotatedRuleCounts) {
-      binarizer.printRuleCounts();
-    }
-
-    if (tuneTreebank != null) {
-      tuneTreebank = tuneTreebank.transform(trainTransformer);
-    }
-
-    Timing.tick("done.");
-    if (op.testOptions.verbose) {
-      binarizer.dumpStats();
-    }
-
-    return new Triple<>(trainTreebank, secondaryTreebank, tuneTreebank);
-  }
-
-   private static void removeDeleteSplittersFromSplitters(TreebankLanguagePack tlp, Options op) {
-    if (op.trainOptions.deleteSplitters != null) {
-      List<String> deleted = new ArrayList<>();
-      for (String del : op.trainOptions.deleteSplitters) {
-        String baseDel = tlp.basicCategory(del);
-        boolean checkBasic = del.equals(baseDel);
-        for (Iterator<String> it = op.trainOptions.splitters.iterator(); it.hasNext(); ) {
-          String elem = it.next();
-          String baseElem = tlp.basicCategory(elem);
-          boolean delStr = checkBasic && baseElem.equals(baseDel) || elem.equals(del);
-          if (delStr) {
-            it.remove();
-            deleted.add(elem);
-          }
-        }
-      }
-      if (op.testOptions.verbose) {
-        log.info("Removed from vertical splitters: " + deleted);
-      }
-    }
-  }
-
 }

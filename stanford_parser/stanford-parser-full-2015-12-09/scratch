@@ -1,0 +1,8 @@
+java -cp "stanford-parser.jar:slf4j-api.jar:" -server -mx1500m edu.stanford.nlp.parser.lexparser.LexicalizedParser -evals "tsv" -goodPCFG -train ../../data/europarl/treebanks/english_train_set -testTreebank ../../data/europarl/treebanks/english_test_set 
+
+Engilsh 
+
+#######################
+
+
+java -Xmx6g -cp "stanford-parser.jar:slf4j-api.jar:" KleinBilingualParser -tLPP edu.stanford.nlp.parser.lexparser.FrenchTreebankParserParams -frenchFactored -encoding UTF-8 -train ../../data/europarl/treebanks/french_train_set_noblanks_clean -test ../../data/europarl/treebanks/french_test_set_clean

@@ -29,6 +29,10 @@ import edu.stanford.nlp.util.Timing;
 import edu.stanford.nlp.util.Triple;
 import edu.stanford.nlp.util.logging.Redwood;
 
+import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.ling.Sentence;
+import edu.stanford.nlp.trees.Tree;
+
 import java.io.*;
 import java.util.*;
 import java.lang.reflect.InvocationTargetException;
@@ -197,11 +201,13 @@ public class KleinBilingualParser extends LexicalizedParser{
       Treebank trainTreebankF = makeTreebank(treebankPathF, fOp, trainFilterF);
       Treebank trainTreebankE = makeTreebank(treebankPathE, eOp, trainFilterE);
 
+      fOp.testOptions.quietEvaluation = true;
+      eOp.testOptions.quietEvaluation = true;
+
       lpF = getParserFromTreebank(trainTreebankF, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
       lpE = getParserFromTreebank(trainTreebankE, null, secondaryTreebankWeight, compactorE, eOp, tuneTreebankE, null);
 
-
-      //TESTING FRENCH
+      //GET FRENCH TREEBANK
 
     // the following has to go after reading parser to make sure
     // op and tlpParams are the same for train and test
@@ -227,41 +233,7 @@ public class KleinBilingualParser extends LexicalizedParser{
 
     fOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(fOp.tlpParams.sisterSplitters()));
 
-    // at this point we should be sure that fOp.tlpParams is
-    // set appropriately (from command line, or from grammar file),
-    // and will never change again.  -- Roger
-
-    if (fOp.testOptions.verbose || trainF) {
-      // Tell the user a little or a lot about what we have made
-      // get lexicon size separately as it may have its own prints in it....
-      String lexNumRules = lpF.lex != null ? Integer.toString(lpF.lex.numRules()): "";
-      log.info("Grammar\tStates\tTags\tWords\tUnaryR\tBinaryR\tTaggings");
-      log.info("Grammar\t" +
-          lpF.stateIndex.size() + '\t' +
-          lpF.tagIndex.size() + '\t' +
-          lpF.wordIndex.size() + '\t' +
-          (lpF.ug != null ? lpF.ug.numRules(): "") + '\t' +
-          (lpF.bg != null ? lpF.bg.numRules(): "") + '\t' +
-          lexNumRules);
-      log.info("ParserPack is " + fOp.tlpParams.getClass().getName());
-      log.info("Lexicon is " + lpF.lex.getClass().getName());
-      if (fOp.testOptions.verbose) {
-        log.info("Tags are: " + lpF.tagIndex);
-        // log.info("States are: " + lp.pd.stateIndex); // This is too verbose. It was already printed out by the below printOptions command if the flag -printStates is given (at training time)!
-      }
-      printOptions(false, fOp);
-    }
-
-    if (testTreebankF != null) {
-      // test parser on treebank
-      EvaluateTreebank evaluator = new EvaluateTreebank(lpF);
-      evaluator.testOnTreebank(testTreebankF);
-    } else {
-      // We parse filenames given by the remaining arguments
-      ParseFiles.parseFiles(args, argIndex, tokenized, tokenizerFactory, elementDelimiter, sentenceDelimiter, escaper, tagDelimiter, fOp, lpF.getTreePrint(), lpF);
-    }
-
-    //TESTING ENGLISH
+    //GET ENGLISH TREEBANK
 
     if (testFilterE != null || testPathE != null) {
       if (testPathE == null) {
@@ -278,42 +250,40 @@ public class KleinBilingualParser extends LexicalizedParser{
 
     eOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(eOp.tlpParams.sisterSplitters()));
 
-    // at this point we should be sure that fOp.tlpParams is
-    // set appropriately (from command line, or from grammar file),
-    // and will never change again.  -- Roger
+    //PARALLEL ALIGNMENT FEATURE CALCULATION
 
-    if (eOp.testOptions.verbose || trainE) {
-      // Tell the user a little or a lot about what we have made
-      // get lexicon size separately as it may have its own prints in it....
-      String lexNumRules = lpE.lex != null ? Integer.toString(lpE.lex.numRules()): "";
-      log.info("Grammar\tStates\tTags\tWords\tUnaryR\tBinaryR\tTaggings");
-      log.info("Grammar\t" +
-          lpE.stateIndex.size() + '\t' +
-          lpE.tagIndex.size() + '\t' +
-          lpE.wordIndex.size() + '\t' +
-          (lpE.ug != null ? lpE.ug.numRules(): "") + '\t' +
-          (lpE.bg != null ? lpE.bg.numRules(): "") + '\t' +
-          lexNumRules);
-      log.info("ParserPack is " + eOp.tlpParams.getClass().getName());
-      log.info("Lexicon is " + lpE.lex.getClass().getName());
-      if (eOp.testOptions.verbose) {
-        log.info("Tags are: " + lpE.tagIndex);
-        // log.info("States are: " + lp.pd.stateIndex); // This is too verbose. It was already printed out by the below printOptions command if the flag -printStates is given (at training time)!
-      }
-      printOptions(false, eOp);
-    }
+int i = 0;
+    Iterator<Tree> eTrees = testTreebankE.iterator();
+    Iterator<Tree> fTrees = testTreebankF.iterator();
 
-    if (testTreebankE != null) {
-      // test parser on treebank
-      EvaluateTreebank evaluator = new EvaluateTreebank(lpE);
-      evaluator.testOnTreebank(testTreebankE);
-    } else {
-      // We parse filenames given by the remaining arguments
-      ParseFiles.parseFiles(args, argIndex, tokenized, tokenizerFactory, elementDelimiter, sentenceDelimiter, escaper, tagDelimiter, eOp, lpE.getTreePrint(), lpE);
+    while(eTrees.hasNext() && fTrees.hasNext()){
+      Tree fTree = fTrees.next();
+      Tree eTree = eTrees.next();
+
+      List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
+      List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
+
+      Tree fTreeParsed = lpF.parseTree(sentenceF);
+      Tree eTreeParsed = lpE.parseTree(sentenceE);
+
+      //BEGIN CALCULATION OF FEATURES
+
+      
     }
 
   } // end main
     
+/////////////////////////
+//
+//  FEATURES
+//
+/////////////////////////
+
+
+
+/////////////////////////
+/////////////////////////
+
     private static Treebank makeTreebank(String treebankPath, Options op, FileFilter filt) {
     log.info("Training a parser from treebank dir: " + treebankPath);
     Treebank trainTreebank = op.tlpParams.diskTreebank();

@@ -268,7 +268,8 @@ int i = 0;
 
       //BEGIN CALCULATION OF FEATURES
 
-      
+      HashMap<Tree, Tree> alignment = getSampleNodeAlignment(eTreeParsed, fTreeParsed);
+      System.out.println(alignment.size());
     }
 
   } // end main
@@ -283,6 +284,46 @@ int i = 0;
 
 /////////////////////////
 /////////////////////////
+
+
+/////////////////////////
+//
+//  KLEIN FUNCTIONS
+//
+/////////////////////////
+
+// assume alignment from french nodes to english nodes
+// omitting leaf node alignments - even if one of the node is a leaf
+// the below function assumes 
+private static HashMap<Tree, Tree> getSampleNodeAlignment(Tree eParseTree, Tree fParseTree){
+  HashMap<Tree, Tree> alignment = new HashMap<>();
+
+  Iterator<Tree> eSubtrees = eParseTree.iterator();
+  for (Tree fSubTree : fParseTree){
+    if (!eSubtrees.hasNext()){
+      break;
+    }
+    else {
+      Tree eSubTree = eSubtrees.next();
+      if (!fSubTree.isLeaf() && !eSubTree.isLeaf()){
+        alignment.put(fSubTree, eSubTree);
+      }
+    }
+  }
+
+  return alignment;
+}
+
+/////////////////////////
+/////////////////////////
+
+
+
+///////////////////////////////
+//
+//  STANFORD PARSER FUNCTIONS
+//
+///////////////////////////////
 
     private static Treebank makeTreebank(String treebankPath, Options op, FileFilter filt) {
     log.info("Training a parser from treebank dir: " + treebankPath);

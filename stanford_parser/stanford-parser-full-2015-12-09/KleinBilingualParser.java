@@ -62,21 +62,28 @@ public class KleinBilingualParser extends LexicalizedParser{
     }
     
     public static void main(String[] args) {
-    boolean train = false;
+    boolean trainF = false;
+    boolean trainE = false;
     boolean saveToSerializedFile = false;
     boolean saveToTextFile = false;
     String serializedInputFileOrUrl = null;
     String textInputFileOrUrl = null;
     String serializedOutputFileOrUrl = null;
     String textOutputFileOrUrl = null;
-    String treebankPath = null;
-    Treebank testTreebank = null;
-    Treebank tuneTreebank = null;
-    String testPath = null;
-    FileFilter testFilter = null;
+    String treebankPathF = null;
+    Treebank testTreebankF = null;
+    Treebank tuneTreebankF = null;
+    String testPathF = null;
+    FileFilter testFilterF = null;
+    String treebankPathE = null;
+    Treebank testTreebankE = null;
+    Treebank tuneTreebankE = null;
+    String testPathE = null;
+    FileFilter testFilterE = null;
     String tunePath = null;
     FileFilter tuneFilter = null;
-    FileFilter trainFilter = null;
+    FileFilter trainFilterF = null;
+    FileFilter trainFilterE = null;
     String secondaryTreebankPath = null;
     double secondaryTreebankWeight = 1.0;
     FileFilter secondaryTrainFilter = null;
@@ -100,16 +107,16 @@ public class KleinBilingualParser extends LexicalizedParser{
     Options fOp = new Options();
     Options eOp = new Options();
     List<String> optionArgs = new ArrayList<>();
-    String encoding = null;
+    String encodingF = null;
     // while loop through option arguments
-    while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
+    while (!args[argIndex].equals("--") && argIndex < args.length && args[argIndex].charAt(0) == '-') {
       if (args[argIndex].equalsIgnoreCase("-train") ||
           args[argIndex].equalsIgnoreCase("-trainTreebank")) {
-        train = true;
+        trainF = true;
         Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        treebankPath = treebankDescription.first();
-        trainFilter = treebankDescription.second();
+        treebankPathF = treebankDescription.first();
+        trainFilterF = treebankDescription.second();
       } else if (args[argIndex].equalsIgnoreCase("-tLPP") && (argIndex + 1 < args.length)) {
         try {
           fOp.tlpParams = (TreebankLangParserParams) Class.forName(args[argIndex + 1]).newInstance();
@@ -127,76 +134,95 @@ public class KleinBilingualParser extends LexicalizedParser{
       } else if (args[argIndex].equalsIgnoreCase("-encoding")) {
         // sets encoding for TreebankLangParserParams
         // redone later to override any serialized parser one read in
-        encoding = args[argIndex + 1];
-        fOp.tlpParams.setInputEncoding(encoding);
-        fOp.tlpParams.setOutputEncoding(encoding);
+        encodingF = args[argIndex + 1];
+        fOp.tlpParams.setInputEncoding(encodingF);
+        fOp.tlpParams.setOutputEncoding(encodingF);
         argIndex += 2;
       } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
                  args[argIndex].equalsIgnoreCase("-testTreebank") ||
                  args[argIndex].equalsIgnoreCase("-test")) {
         Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        testPath = treebankDescription.first();
-        testFilter = treebankDescription.second();
+        testPathF = treebankDescription.first();
+        testFilterF = treebankDescription.second();
       } else {
         int oldIndex = argIndex;
         argIndex = fOp.setOptionOrWarn(args, argIndex);
         optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
       }
-    } // end while loop through arguments
 
-    // all other arguments are order dependent and
-    // are processed in order below
+      System.out.println(argIndex + " " + args.length);
+    } // end while loop through arguments for french
 
-    if (tuneFilter != null || tunePath != null) {
-      if (tunePath == null) {
-        if (treebankPath == null) {
-          throw new RuntimeException("No tune treebank path specified...");
-        } else {
-          log.info("No tune treebank path specified.  Using train path: \"" + treebankPath + '\"');
-          tunePath = treebankPath;
-        }
+    argIndex++;//go to english arguments
+
+    while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
+      if (args[argIndex].equalsIgnoreCase("-train") ||
+          args[argIndex].equalsIgnoreCase("-trainTreebank")) {
+        trainE = true;
+        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
+        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+        treebankPathE = treebankDescription.first();
+        trainFilterE = treebankDescription.second();
+      } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
+                 args[argIndex].equalsIgnoreCase("-testTreebank") ||
+                 args[argIndex].equalsIgnoreCase("-test")) {
+        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+        testPathE = treebankDescription.first();
+        testFilterE = treebankDescription.second();
+      } else {
+        int oldIndex = argIndex;
+        argIndex = eOp.setOptionOrWarn(args, argIndex);
+        optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
       }
-      tuneTreebank = fOp.tlpParams.testMemoryTreebank();
-      tuneTreebank.loadPath(tunePath, tuneFilter);
-    }
+    } // end while loop through arguments for english
 
 //    if (!train && fOp.testOptions.verbose) {
 //      StringUtils.logInvocationString(log, args);
 //    }
-    LexicalizedParser lp; // always initialized in next if-then-else block
+    LexicalizedParser lpF; // always initialized in next if-then-else block
+    LexicalizedParser lpE;
     //TRAIN A PARSER
       // so we train a parser using the treebank
-      GrammarCompactor compactor = null;
+      GrammarCompactor compactorF = null;
+      GrammarCompactor compactorE = null;
       if (fOp.trainOptions.compactGrammar() == 3) {
-        compactor = new ExactGrammarCompactor(fOp, false, false);
+        compactorF = new ExactGrammarCompactor(fOp, false, false);
+      }
+      if (eOp.trainOptions.compactGrammar() == 3) {
+        compactorE = new ExactGrammarCompactor(eOp, false, false);
       }
 
-      Treebank trainTreebank = makeTreebank(treebankPath, fOp, trainFilter);
+      Treebank trainTreebankF = makeTreebank(treebankPathF, fOp, trainFilterF);
+      Treebank trainTreebankE = makeTreebank(treebankPathE, eOp, trainFilterE);
 
-      lp = getParserFromTreebank(trainTreebank, null, secondaryTreebankWeight, compactor, fOp, tuneTreebank, null);
+      lpF = getParserFromTreebank(trainTreebankF, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
+      lpE = getParserFromTreebank(trainTreebankE, null, secondaryTreebankWeight, compactorE, eOp, tuneTreebankE, null);
 
+
+      //TESTING FRENCH
 
     // the following has to go after reading parser to make sure
     // op and tlpParams are the same for train and test
     // THIS IS BUTT UGLY BUT IT STOPS USER SPECIFIED ENCODING BEING
     // OVERWRITTEN BY ONE SPECIFIED IN SERIALIZED PARSER
-    if (encoding != null) {
-      fOp.tlpParams.setInputEncoding(encoding);
-      fOp.tlpParams.setOutputEncoding(encoding);
+    if (encodingF != null) {
+      fOp.tlpParams.setInputEncoding(encodingF);
+      fOp.tlpParams.setOutputEncoding(encodingF);
     }
 
-    if (testFilter != null || testPath != null) {
-      if (testPath == null) {
-        if (treebankPath == null) {
+    if (testFilterF != null || testPathF != null) {
+      if (testPathF == null) {
+        if (treebankPathF == null) {
           throw new RuntimeException("No test treebank path specified...");
         } else {
-          log.info("No test treebank path specified.  Using train path: \"" + treebankPath + '\"');
-          testPath = treebankPath;
+          log.info("No test treebank path specified.  Using train path: \"" + treebankPathF + '\"');
+          testPathF = treebankPathF;
         }
       }
-      testTreebank = fOp.tlpParams.testMemoryTreebank();
-      testTreebank.loadPath(testPath, testFilter);
+      testTreebankF = fOp.tlpParams.testMemoryTreebank();
+      testTreebankF.loadPath(testPathF, testFilterF);
     }
 
     fOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(fOp.tlpParams.sisterSplitters()));
@@ -205,45 +231,85 @@ public class KleinBilingualParser extends LexicalizedParser{
     // set appropriately (from command line, or from grammar file),
     // and will never change again.  -- Roger
 
-    if (fOp.testOptions.verbose || train) {
+    if (fOp.testOptions.verbose || trainF) {
       // Tell the user a little or a lot about what we have made
       // get lexicon size separately as it may have its own prints in it....
-      String lexNumRules = lp.lex != null ? Integer.toString(lp.lex.numRules()): "";
+      String lexNumRules = lpF.lex != null ? Integer.toString(lpF.lex.numRules()): "";
       log.info("Grammar\tStates\tTags\tWords\tUnaryR\tBinaryR\tTaggings");
       log.info("Grammar\t" +
-          lp.stateIndex.size() + '\t' +
-          lp.tagIndex.size() + '\t' +
-          lp.wordIndex.size() + '\t' +
-          (lp.ug != null ? lp.ug.numRules(): "") + '\t' +
-          (lp.bg != null ? lp.bg.numRules(): "") + '\t' +
+          lpF.stateIndex.size() + '\t' +
+          lpF.tagIndex.size() + '\t' +
+          lpF.wordIndex.size() + '\t' +
+          (lpF.ug != null ? lpF.ug.numRules(): "") + '\t' +
+          (lpF.bg != null ? lpF.bg.numRules(): "") + '\t' +
           lexNumRules);
       log.info("ParserPack is " + fOp.tlpParams.getClass().getName());
-      log.info("Lexicon is " + lp.lex.getClass().getName());
+      log.info("Lexicon is " + lpF.lex.getClass().getName());
       if (fOp.testOptions.verbose) {
-        log.info("Tags are: " + lp.tagIndex);
+        log.info("Tags are: " + lpF.tagIndex);
         // log.info("States are: " + lp.pd.stateIndex); // This is too verbose. It was already printed out by the below printOptions command if the flag -printStates is given (at training time)!
       }
       printOptions(false, fOp);
     }
 
-    if (testTreebank != null) {
+    if (testTreebankF != null) {
       // test parser on treebank
-      EvaluateTreebank evaluator = new EvaluateTreebank(lp);
-      evaluator.testOnTreebank(testTreebank);
-    } else if (argIndex >= args.length) {
-      // no more arguments, so we just parse our own test sentence
-      PrintWriter pwOut = fOp.tlpParams.pw();
-      PrintWriter pwErr = fOp.tlpParams.pw(System.err);
-      ParserQuery pq = lp.parserQuery();
-      if (pq.parse(fOp.tlpParams.defaultTestSentence())) {
-        lp.getTreePrint().printTree(pq.getBestParse(), pwOut);
-      } else {
-        pwErr.println("Error. Can't parse test sentence: " +
-                      fOp.tlpParams.defaultTestSentence());
-      }
+      EvaluateTreebank evaluator = new EvaluateTreebank(lpF);
+      evaluator.testOnTreebank(testTreebankF);
     } else {
       // We parse filenames given by the remaining arguments
-      ParseFiles.parseFiles(args, argIndex, tokenized, tokenizerFactory, elementDelimiter, sentenceDelimiter, escaper, tagDelimiter, fOp, lp.getTreePrint(), lp);
+      ParseFiles.parseFiles(args, argIndex, tokenized, tokenizerFactory, elementDelimiter, sentenceDelimiter, escaper, tagDelimiter, fOp, lpF.getTreePrint(), lpF);
+    }
+
+    //TESTING ENGLISH
+
+    if (testFilterE != null || testPathE != null) {
+      if (testPathE == null) {
+        if (treebankPathE == null) {
+          throw new RuntimeException("No test treebank path specified...");
+        } else {
+          log.info("No test treebank path specified.  Using train path: \"" + treebankPathE + '\"');
+          testPathE = treebankPathE;
+        }
+      }
+      testTreebankE = eOp.tlpParams.testMemoryTreebank();
+      testTreebankE.loadPath(testPathE, testFilterE);
+    }
+
+    eOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(eOp.tlpParams.sisterSplitters()));
+
+    // at this point we should be sure that fOp.tlpParams is
+    // set appropriately (from command line, or from grammar file),
+    // and will never change again.  -- Roger
+
+    if (eOp.testOptions.verbose || trainE) {
+      // Tell the user a little or a lot about what we have made
+      // get lexicon size separately as it may have its own prints in it....
+      String lexNumRules = lpE.lex != null ? Integer.toString(lpE.lex.numRules()): "";
+      log.info("Grammar\tStates\tTags\tWords\tUnaryR\tBinaryR\tTaggings");
+      log.info("Grammar\t" +
+          lpE.stateIndex.size() + '\t' +
+          lpE.tagIndex.size() + '\t' +
+          lpE.wordIndex.size() + '\t' +
+          (lpE.ug != null ? lpE.ug.numRules(): "") + '\t' +
+          (lpE.bg != null ? lpE.bg.numRules(): "") + '\t' +
+          lexNumRules);
+      log.info("ParserPack is " + eOp.tlpParams.getClass().getName());
+      log.info("Lexicon is " + lpE.lex.getClass().getName());
+      if (eOp.testOptions.verbose) {
+        log.info("Tags are: " + lpE.tagIndex);
+        // log.info("States are: " + lp.pd.stateIndex); // This is too verbose. It was already printed out by the below printOptions command if the flag -printStates is given (at training time)!
+      }
+      printOptions(false, eOp);
+    }
+
+    if (testTreebankE != null) {
+      // test parser on treebank
+      EvaluateTreebank evaluator = new EvaluateTreebank(lpE);
+      evaluator.testOnTreebank(testTreebankE);
+    } else {
+      // We parse filenames given by the remaining arguments
+      ParseFiles.parseFiles(args, argIndex, tokenized, tokenizerFactory, elementDelimiter, sentenceDelimiter, escaper, tagDelimiter, eOp, lpE.getTreePrint(), lpE);
     }
 
   } // end main

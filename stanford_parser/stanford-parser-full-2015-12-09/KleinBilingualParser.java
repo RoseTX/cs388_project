@@ -269,7 +269,12 @@ int i = 0;
       //BEGIN CALCULATION OF FEATURES
 
       HashMap<Tree, Tree> alignment = getSampleNodeAlignment(eTreeParsed, fTreeParsed);
-      System.out.println(alignment.size());
+
+      System.out.println("=================================");
+      for (Map.Entry entry : alignment.entrySet()){
+        System.out.println(numChildren((Tree) entry.getKey(), (Tree) entry.getValue()));
+      }
+      System.out.println("=================================");
     }
 
   } // end main
@@ -280,7 +285,20 @@ int i = 0;
 //
 /////////////////////////
 
+private static int spanDiff (Tree nodeF, Tree nodeE){
+  System.out.print(nodeF.getLeaves().size() + " " + nodeE.getLeaves().size() + " : ");
+  return Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size());
+}
 
+//assuming this is an indicator that checks if the number of children is the same or not
+private static int numChildren (Tree nodeF, Tree nodeE){
+  if (nodeF.numChildren() == nodeE.numChildren()){
+    return 1;
+  }
+  else {
+    return 0;
+  }
+}
 
 /////////////////////////
 /////////////////////////

@@ -6,6 +6,7 @@ import edu.stanford.nlp.parser.lexparser.Options;
 import edu.stanford.nlp.parser.lexparser.UnaryGrammar;
 import edu.stanford.nlp.trees.Treebank;
 import edu.stanford.nlp.ling.HasWord;
+import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.parser.common.ArgUtils;
 import edu.stanford.nlp.parser.common.ParserQuery;
@@ -27,6 +28,7 @@ import edu.stanford.nlp.util.StringUtils;
 import edu.stanford.nlp.util.Timing;
 import edu.stanford.nlp.util.Triple;
 import edu.stanford.nlp.util.logging.Redwood;
+import edu.stanford.nlp.util.IntPair;
 
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.Sentence;
@@ -95,6 +97,7 @@ public class KleinBilingualParser extends LexicalizedParser{
         String secondaryTreebankPath = null;
         double secondaryTreebankWeight = 1.0;
         FileFilter secondaryTrainFilter = null;
+        String alignFile=null;
         
         // variables needed to process the files to be parsed
         TokenizerFactory<? extends HasWord> tokenizerFactory = null;
@@ -179,7 +182,12 @@ public class KleinBilingualParser extends LexicalizedParser{
                 argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
                 testPathE = treebankDescription.first();
                 testFilterE = treebankDescription.second();
-            } else {
+            } else if (args[argIndex].equalsIgnoreCase("-alignFile"))
+            {
+                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-alignFile");
+                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                alignFile=treebankDescription.first();
+            }else {
                 int oldIndex = argIndex;
                 argIndex = eOp.setOptionOrWarn(args, argIndex);
                 optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
@@ -254,103 +262,140 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         eOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(eOp.tlpParams.sisterSplitters()));
         
-        //PARALLEL ALIGNMENT FEATURE CALCULATION
+        //PARALLEL ALIGNMENT FEATURE CALCULATION, CALCULATION OF 'A' MATRIX
+
+        double[] weights = new double[4];
+        double diff;
+       weights[0] = 0.1;
+       weights[1] = -0.2;
+       weights[2] = 0.02;
+       weights[3] = 0.2;
+
+
+        ArrayList<TreeMap<Integer,ArrayList<Integer>>> alignments=null;
+        //String alignFile="../../berkeleyaligner/output/test.align";
+        try{
+           
+           AlignmentProcessor p = new AlignmentProcessor(alignFile);
+           alignments = p.createAlignments();
+          
+          }catch(FileNotFoundException e){ throw new RuntimeException(e);
+          }catch(IOException e){throw new RuntimeException(e);}
         
-        Iterator<Tree> eTrees = testTreebankE.iterator();
-        Iterator<Tree> fTrees = testTreebankF.iterator();
-        int kE = 10;
-        int kF = 10;
-        int numFeatures = 4;
-        //features are used in the order they are defined
-        double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
-        int ePsGold[] = new int[testTreebankE.size()];
-        int fPsGold[] = new int[testTreebankF.size()];
-        
-        int i = 0;
-        while(eTrees.hasNext() && fTrees.hasNext()){
-            Tree fTree = fTrees.next();
-            Tree eTree = eTrees.next();
+        do {
+            diff = 0.0;
+            Iterator<Tree> eTrees = testTreebankE.iterator();
+            Iterator<Tree> fTrees = testTreebankF.iterator();
+            Iterator<TreeMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
+
+            int kE = 10;
+            int kF = 10;
+            int numFeatures = 4;
+            //features are used in the order they are defined
+            double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
+            int ePsGold[] = new int[testTreebankE.size()];
+            int fPsGold[] = new int[testTreebankF.size()];
             
-            List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
-            List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
-            
-            LexicalizedParserQuery lpqE = (LexicalizedParserQuery) lpE.parserQuery();
-            LexicalizedParserQuery lpqF = (LexicalizedParserQuery) lpF.parserQuery();
-            
-            lpqE.parse(sentenceE);
-            lpqF.parse(sentenceF);
-            
-            List<ScoredObject<Tree>> kBestF = lpqF.getKBestPCFGParses(kF);
-            List<ScoredObject<Tree>> kBestE = lpqE.getKBestPCFGParses(kE);
-            
-            fPsGold[i] = 3;
-            ePsGold[i] = 3;
-            
-            int j = 0;
-            int k = 0;
-            
-            for (ScoredObject<Tree> eScoredObj : kBestE){
-                k = 0;
-                for (ScoredObject<Tree> fScoredObj : kBestF){
-                    HashMap<Tree, Tree> alignment = getSampleNodeAlignment(eScoredObj.object(), fScoredObj.object());
-                    
-                    //had to reduce likelihood scores by factor of 10 to keep the optimizer working
-                    A[i][0][j][k] = eScoredObj.score()/10;
-                    A[i][1][j][k] = fScoredObj.score()/10;
-                    
-                    for (Map.Entry entry : alignment.entrySet()){
-                        Tree nodeF = (Tree) entry.getKey();
-                        Tree nodeE = (Tree) entry.getValue();
+            int i = 0;
+            while(eTrees.hasNext() && fTrees.hasNext() && alignIterator.hasNext()){
+
+                TreeMap<Integer,ArrayList<Integer>> alignMap = alignIterator.next();
+                Tree fTree = fTrees.next();
+                Tree eTree = eTrees.next();
+                
+                List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
+                List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
+                
+                LexicalizedParserQuery lpqE = (LexicalizedParserQuery) lpE.parserQuery();
+                LexicalizedParserQuery lpqF = (LexicalizedParserQuery) lpF.parserQuery();
+                
+                lpqE.parse(sentenceE);
+                lpqF.parse(sentenceF);
+                
+                List<ScoredObject<Tree>> kBestF = lpqF.getKBestPCFGParses(kF);
+                List<ScoredObject<Tree>> kBestE = lpqE.getKBestPCFGParses(kE);
+                
+                fPsGold[i] = 3;
+                ePsGold[i] = 3;
+                
+                int j = 0;
+                int k = 0;
+                
+                for (ScoredObject<Tree> eScoredObj : kBestE){
+                    k = 0;
+                    for (ScoredObject<Tree> fScoredObj : kBestF){
+                        HashMap<Tree, Tree> alignment = getHungarianAlignment(eScoredObj.object(), fScoredObj.object(), weights);
                         
-                        A[i][2][j][k] += (double) spanDiff(nodeF, nodeE);
-                        A[i][3][j][k] += (double) numChildren(nodeF, nodeE);
+                        //had to reduce likelihood scores by factor of 10 to keep the optimizer working
+                        A[i][0][j][k] = eScoredObj.score()/100;
+                        A[i][1][j][k] = fScoredObj.score()/100;
+                        
+                        for (Map.Entry entry : alignment.entrySet()){
+                            Tree nodeF = (Tree) entry.getKey();
+                            Tree nodeE = (Tree) entry.getValue();
+
+                            nodeF.setSpans();
+                            nodeE.setSpans();
+
+                            double inBoth_feature=insideBoth(nodeF,nodeE, alignMap);
+                            double inSrcOutTgt_feature= insideSrcOutsideTgt(nodeF,nodeE, alignMap);
+                            double inTgtOutSrc_feature= insideTgtOutsideSrc(nodeF,nodeE, alignMap);
+                        
+                            
+                            A[i][2][j][k] += spanDiff(nodeF, nodeE);
+                            A[i][3][j][k] += numChildren(nodeF, nodeE);
+                        }
+                        
+                        k++;
                     }
-                    
-                    k++;
+                    j++;
                 }
-                j++;
+                i++;
             }
-            i++;
+            
+            
+            ///////////////////////
+            //
+            //  MALLET optimizer
+            //
+            ///////////////////////
+            System.out.println();
+            System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
+            System.out.println();
+            System.out.println("Beginning convex optimization...");
+            System.out.println();
+            System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
+            System.out.println();
+            
+            OptimizerExample optimizable = new OptimizerExample(weights, A, ePsGold, fPsGold);
+            Optimizer optimizer = new LimitedMemoryBFGS(optimizable);
+            
+            boolean converged = false;
+            
+            try {
+                converged = optimizer.optimize();
+            } catch (IllegalArgumentException e) {
+                // This exception may be thrown if L-BFGS
+                //  cannot step in the current direction.
+                // This condition does not necessarily mean that
+                //  the optimizer has failed, but it doesn't want
+                //  to claim to have succeeded...
+            } catch (cc.mallet.optimize.OptimizationException e) {
+                System.out.println(e.getMessage());
+            }
+            
+            System.out.println(optimizable.getParameter(0) + ", " + optimizable.getParameter(1) + ", " + optimizable.getParameter(2) + ", " + optimizable.getParameter(3));
+
+            for (int x = 0; x < weights.length; x++){
+                diff += (optimizable.getParameter(x) - weights[x])*(optimizable.getParameter(x) - weights[x]);
+                weights[x] = optimizable.getParameter(x);
+            }
+            diff /= weights.length;
+
+            System.out.println(diff);
         }
-        
-        
-        ///////////////////////
-        //
-        //  MALLET optimizer
-        //
-        ///////////////////////
-        System.out.println();
-        System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
-        System.out.println();
-        System.out.println("Beginning convex optimization...");
-        System.out.println();
-        System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
-        System.out.println();
-        
-        double[] initWeights = new double[4];
-//        initWeights[0] = 0.1;
-//        initWeights[1] = -0.2;
-//        initWeights[2] = 0.02;
-//        initWeights[3] = 0.2;
-        
-        OptimizerExample optimizable = new OptimizerExample(initWeights, A, ePsGold, fPsGold);
-        Optimizer optimizer = new LimitedMemoryBFGS(optimizable);
-        
-        boolean converged = false;
-        
-        try {
-            converged = optimizer.optimize();
-        } catch (IllegalArgumentException e) {
-            // This exception may be thrown if L-BFGS
-            //  cannot step in the current direction.
-            // This condition does not necessarily mean that
-            //  the optimizer has failed, but it doesn't want
-            //  to claim to have succeeded...
-        } catch (cc.mallet.optimize.OptimizationException e) {
-            System.out.println(e.getMessage());
-        }
-        
-        System.out.println(optimizable.getParameter(0) + ", " + optimizable.getParameter(1) + ", " + optimizable.getParameter(2) + ", " + optimizable.getParameter(3));
+        while (diff > 0.0005);
+
         
     } // end main
     
@@ -369,19 +414,117 @@ public class KleinBilingualParser extends LexicalizedParser{
         return 0.0;
     }
     
-    private static int spanDiff (Tree nodeF, Tree nodeE){
-        return Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size());
+    private static double spanDiff (Tree nodeF, Tree nodeE){
+        return ((double) Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size()))/10;
     }
     
     //assuming this is an indicator that checks if the number of children is the same or not
-    private static int numChildren (Tree nodeF, Tree nodeE){
+    private static double numChildren (Tree nodeF, Tree nodeE){
         if (nodeF.numChildren() == nodeE.numChildren()){
-            return 1;
+            return 1.0;
         }
         else {
-            return 0;
+            return 0.0;
         }
     }
+
+    private static double insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+{
+  
+    IntPair spanF=nodeF.getSpan();
+    IntPair spanE=nodeF.getSpan();
+    /*
+    List<Word> sentenceF = nodeF.yieldWords();
+    List<Word> sentenceE = nodeE.yieldWords();
+
+          for(int h=0;h<sentenceF.size();h++)
+              System.out.print(sentenceF.get(h)+" ");
+            System.out.println();
+
+            for(int h=0;h<sentenceE.size();h++)
+              System.out.print(sentenceE.get(h)+" ");
+            System.out.println();    
+    */
+
+   /* if(spanF.getSource()!=spanE.getSource() || spanF.getTarget()!=spanE.getTarget())
+    {
+      System.out.println("DIFFERENT");
+        System.out.println(spanF.getSource()+" "+spanF.getTarget());
+      System.out.println(spanE.getSource()+" "+spanE.getTarget());
+    }
+    */
+
+    double sum=0;
+    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
+    {
+      for (int e=spanE.getSource();e<=spanE.getTarget();e++)
+      {
+        //System.out.println("indices:"+f+" "+e);
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+
+    return sum;
+}
+
+private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+{
+  
+    IntPair spanF=nodeF.getSpan();
+    IntPair spanE=nodeF.getSpan();
+
+    double sum=0;
+    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
+    {
+      for (int e=0;e<spanE.getSource();e++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
+    {
+      for (int e=spanE.getTarget()+1;e<nodeE.size();e++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+    return sum;
+}
+
+
+private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+{
+  
+    IntPair spanF=nodeF.getSpan();
+    IntPair spanE=nodeF.getSpan();
+
+    double sum=0;
+    for (int e=spanE.getSource();e<=spanE.getTarget();e++)
+    {
+      for (int f=0;e<spanF.getSource();f++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+    for (int e=spanE.getSource();e<=spanE.getTarget();e++)
+    {
+      for (int f=spanF.getTarget()+1;f<nodeF.size();f++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }  
+    return sum;
+}
+
     
     /////////////////////////
     /////////////////////////
@@ -414,6 +557,53 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         return alignment;
     }
+
+    private static HashMap<Tree, Tree> getHungarianAlignment(Tree eParseTree, Tree fParseTree, double[] weights){
+      // remember to ignore the top two weights because they are monolingual features
+      int numFrenchNodes = fParseTree.size() - fParseTree.getLeaves().size();
+      int numEnglishNodes = eParseTree.size() - eParseTree.getLeaves().size();
+
+      double[][] costMatrix = new double[numFrenchNodes][numEnglishNodes];
+
+      int i,j;
+      i = 0;
+
+      for (Tree fSubTree : fParseTree){
+        if (!fSubTree.isLeaf()){
+          j = 0;
+          for (Tree eSubTree : eParseTree){
+            if (!eSubTree.isLeaf()){
+              costMatrix[i][j] = weights[2]*spanDiff(fSubTree, eSubTree) + weights[3]*numChildren(fSubTree, eSubTree);
+              j++;
+            }
+          }
+          i++;
+        }
+      }
+
+      HungarianAlgorithm hungAlgSolver = new HungarianAlgorithm(costMatrix);
+      int[] assignments = hungAlgSolver.execute();
+
+      HashMap<Tree, Tree> alignment = new HashMap<>();
+
+      i = 0;
+      for (Tree fSubTree : fParseTree){
+        if (!fSubTree.isLeaf()){
+          j = 0;
+          for (Tree eSubTree : eParseTree){
+            if (!eSubTree.isLeaf()){
+              if (j == assignments[i]){
+                alignment.put(fSubTree, eSubTree);
+              }
+              j++;
+            }
+          }
+          i++;
+        }
+      }
+
+      return alignment;
+    }
     
     /////////////////////////
     /////////////////////////
@@ -438,7 +628,8 @@ public class KleinBilingualParser extends LexicalizedParser{
         int[] fPseGold;
         
         public OptimizerExample(double[] weights, double[][][][] A, int[] ePseGold, int[] fPseGold) {
-            parameters = weights;
+            parameters = new double[weights.length];
+            deepArrayCopy(weights, parameters);
             this.A = A;
             this.ePseGold = ePseGold;
             this.fPseGold = fPseGold;
@@ -578,6 +769,18 @@ public class KleinBilingualParser extends LexicalizedParser{
             op.testOptions.display();
         }
         op.tlpParams.display();
+    }
+
+    ///////////////////////////////
+    //
+    //  MISCELLANEOUS FUNCTIONS
+    //
+    ///////////////////////////////
+
+    private static void deepArrayCopy(double[] src, double[] dest){
+        for (int i = 0; i < src.length; i++){
+            dest[i] = src[i];
+        }
     }
     
 }

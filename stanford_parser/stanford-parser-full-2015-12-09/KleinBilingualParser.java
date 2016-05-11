@@ -97,6 +97,8 @@ public class KleinBilingualParser extends LexicalizedParser{
         String secondaryTreebankPath = null;
         double secondaryTreebankWeight = 1.0;
         FileFilter secondaryTrainFilter = null;
+        String alignFile=null;
+       
         
         // variables needed to process the files to be parsed
         TokenizerFactory<? extends HasWord> tokenizerFactory = null;
@@ -181,7 +183,12 @@ public class KleinBilingualParser extends LexicalizedParser{
                 argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
                 testPathE = treebankDescription.first();
                 testFilterE = treebankDescription.second();
-            } else {
+            } else if (args[argIndex].equalsIgnoreCase("-alignFile"))
+            {
+                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-alignFile");
+                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                alignFile=treebankDescription.first();
+            }else {
                 int oldIndex = argIndex;
                 argIndex = eOp.setOptionOrWarn(args, argIndex);
                 optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
@@ -261,7 +268,7 @@ public class KleinBilingualParser extends LexicalizedParser{
 
         //HARD CODED NEED TO CHANGE to ARGUMENT TO PARSER
         ArrayList<TreeMap<Integer,ArrayList<Integer>>> alignments=null;
-        String alignFile="../../berkeleyaligner/output/test.align";
+        //String alignFile="../../berkeleyaligner/output/test.align";
         try{
            
            AlignmentProcessor p = new AlignmentProcessor(alignFile);
@@ -507,7 +514,7 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Intege
         if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
           sum++;
       }
-    }
+    }  
     return sum;
 }
 

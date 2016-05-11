@@ -329,9 +329,9 @@ public class KleinBilingualParser extends LexicalizedParser{
                         nodeF.setSpans();
                         nodeE.setSpans();
 
-                        int inBoth_feature=insideBoth(nodeF,nodeE, alignMap);
-                        int inSrcOutTgt_feature= insideSrcOutsideTgt(nodeF,nodeE, alignMap);
-                        int inTgtOutSrc_feature= insideTgtOutsideSrc(nodeF,nodeE, alignMap);
+                        double inBoth_feature=insideBoth(nodeF,nodeE, alignMap);
+                        double inSrcOutTgt_feature= insideSrcOutsideTgt(nodeF,nodeE, alignMap);
+                        double inTgtOutSrc_feature= insideTgtOutsideSrc(nodeF,nodeE, alignMap);
                         
                         A[i][2][j][k] += (double) spanDiff(nodeF, nodeE);
                         A[i][3][j][k] += (double) numChildren(nodeF, nodeE);
@@ -414,7 +414,7 @@ public class KleinBilingualParser extends LexicalizedParser{
         }
     }
 
-private static int insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+private static double insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
 {
   
     IntPair spanF=nodeF.getSpan();
@@ -440,7 +440,7 @@ private static int insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<
     }
     */
 
-    int sum=0;
+    double sum=0;
     for (int f=spanF.getSource();f<=spanF.getTarget();f++)
     {
       for (int e=spanE.getSource();e<=spanE.getTarget();e++)
@@ -455,13 +455,13 @@ private static int insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<
     return sum;
 }
 
-private static int insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
 {
   
     IntPair spanF=nodeF.getSpan();
     IntPair spanE=nodeF.getSpan();
 
-    int sum=0;
+    double sum=0;
     for (int f=spanF.getSource();f<=spanF.getTarget();f++)
     {
       for (int e=0;e<spanE.getSource();e++)
@@ -484,13 +484,13 @@ private static int insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Integer,A
 }
 
 
-private static int insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
 {
   
     IntPair spanF=nodeF.getSpan();
     IntPair spanE=nodeF.getSpan();
 
-    int sum=0;
+    double sum=0;
     for (int e=spanE.getSource();e<=spanE.getTarget();e++)
     {
       for (int f=0;e<spanF.getSource();f++)

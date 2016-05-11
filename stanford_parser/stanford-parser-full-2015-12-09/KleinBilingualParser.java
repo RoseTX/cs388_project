@@ -502,7 +502,7 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Intege
 
     for (int e=spanE.getSource();e<=spanE.getTarget();e++)
     {
-      for (int f=spanF.getTarget()+1;f<nodeE.size();f++)
+      for (int f=spanF.getTarget()+1;f<nodeF.size();f++)
       {
         if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
           sum++;

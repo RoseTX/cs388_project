@@ -260,7 +260,7 @@ public class KleinBilingualParser extends LexicalizedParser{
         Iterator<Tree> fTrees = testTreebankF.iterator();
         int kE = 10;
         int kF = 10;
-        int numFeatures = 2;
+        int numFeatures = 4;
         //features are used in the order they are defined
         double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
         int ePsGold[] = new int[testTreebankE.size()];
@@ -294,12 +294,16 @@ public class KleinBilingualParser extends LexicalizedParser{
                 for (ScoredObject<Tree> fScoredObj : kBestF){
                     HashMap<Tree, Tree> alignment = getSampleNodeAlignment(eScoredObj.object(), fScoredObj.object());
                     
+                    //had to reduce likelihood scores by factor of 10 to keep the optimizer working
+                    A[i][0][j][k] = eScoredObj.score()/10;
+                    A[i][1][j][k] = fScoredObj.score()/10;
+                    
                     for (Map.Entry entry : alignment.entrySet()){
                         Tree nodeF = (Tree) entry.getKey();
                         Tree nodeE = (Tree) entry.getValue();
                         
-                        A[i][0][j][k] += (double) spanDiff(nodeF, nodeE);
-                        A[i][1][j][k] += (double) numChildren(nodeF, nodeE);
+                        A[i][2][j][k] += (double) spanDiff(nodeF, nodeE);
+                        A[i][3][j][k] += (double) numChildren(nodeF, nodeE);
                     }
                     
                     k++;
@@ -323,7 +327,12 @@ public class KleinBilingualParser extends LexicalizedParser{
         System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
         System.out.println();
         
-        double[] initWeights = new double[2];
+        double[] initWeights = new double[4];
+//        initWeights[0] = 0.1;
+//        initWeights[1] = -0.2;
+//        initWeights[2] = 0.02;
+//        initWeights[3] = 0.2;
+        
         OptimizerExample optimizable = new OptimizerExample(initWeights, A, ePsGold, fPsGold);
         Optimizer optimizer = new LimitedMemoryBFGS(optimizable);
         
@@ -337,10 +346,11 @@ public class KleinBilingualParser extends LexicalizedParser{
             // This condition does not necessarily mean that
             //  the optimizer has failed, but it doesn't want
             //  to claim to have succeeded...
+        } catch (cc.mallet.optimize.OptimizationException e) {
+            System.out.println(e.getMessage());
         }
         
-        System.out.println(optimizable.getParameter(0) + ", " +
-                           optimizable.getParameter(1));
+        System.out.println(optimizable.getParameter(0) + ", " + optimizable.getParameter(1) + ", " + optimizable.getParameter(2) + ", " + optimizable.getParameter(3));
         
     } // end main
     
@@ -349,6 +359,15 @@ public class KleinBilingualParser extends LexicalizedParser{
     //  FEATURES
     //
     /////////////////////////
+    
+    private static double eLikelihood (Tree nodeF, Tree nodeE){//included for clarity
+        return 0.0;
+        //this function is calculated directly in the
+    }
+    
+    private static double fLikelihood (Tree nodeF, Tree nodeE){//included for clarity
+        return 0.0;
+    }
     
     private static int spanDiff (Tree nodeF, Tree nodeE){
         return Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size());
@@ -494,11 +513,13 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         // The following get/set methods satisfy the Optimizable interface
         
-        public int getNumParameters() { return 2; }
+        public int getNumParameters() { return 4; }
         public double getParameter(int i) { return parameters[i]; }
         public void getParameters(double[] buffer) {
             buffer[0] = parameters[0];
             buffer[1] = parameters[1];
+            buffer[2] = parameters[2];
+            buffer[3] = parameters[3];
         }
         
         public void setParameter(int i, double r) {
@@ -507,6 +528,8 @@ public class KleinBilingualParser extends LexicalizedParser{
         public void setParameters(double[] newParameters) {
             parameters[0] = newParameters[0];
             parameters[1] = newParameters[1];
+            parameters[2] = newParameters[2];
+            parameters[3] = newParameters[3];
         }
     }
     

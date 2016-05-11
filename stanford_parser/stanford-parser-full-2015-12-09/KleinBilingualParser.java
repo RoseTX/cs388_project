@@ -315,8 +315,16 @@ public class KleinBilingualParser extends LexicalizedParser{
         //  MALLET optimizer
         //
         ///////////////////////
+        System.out.println();
+        System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
+        System.out.println();
+        System.out.println("Beginning convex optimization...");
+        System.out.println();
+        System.out.println("*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*!*");
+        System.out.println();
         
-        OptimizerExample optimizable = new OptimizerExample(0, 0, 4.4);
+        double[] initWeights = new double[2];
+        OptimizerExample optimizable = new OptimizerExample(initWeights, A, ePsGold, fPsGold);
         Optimizer optimizer = new LimitedMemoryBFGS(optimizable);
         
         boolean converged = false;
@@ -406,29 +414,82 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         double[] parameters;
         
-        double A;
+        double[][][][] A;
+        int[] ePseGold;
+        int[] fPseGold;
         
-        public OptimizerExample(double x, double y, double A) {
-            parameters = new double[2];
-            parameters[0] = x;
-            parameters[1] = y;
+        public OptimizerExample(double[] weights, double[][][][] A, int[] ePseGold, int[] fPseGold) {
+            parameters = weights;
             this.A = A;
+            this.ePseGold = ePseGold;
+            this.fPseGold = fPseGold;
         }
         
         public double getValue() {
+            double result = 0.0;
             
-            double x = parameters[0];
-            double y = parameters[1];
+            for (int i = 0; i < this.A.length; i++){
+                double pseGoldResult = 0.0;
+                double allPairs = 0.0;
+                
+                for (int j = 0; j < this.A[0][0].length; j++){
+                    for (int k = 0; k < this.A[0][0][0].length; k++){
+                        double singlePairScore = 1.0;
+                        
+                        for (int m = 0; m < this.parameters.length; m++){
+                            singlePairScore *= Math.exp(this.A[i][m][j][k] * this.parameters[m]);
+                        }
+                        
+                        allPairs += singlePairScore;
+                        if (j < this.ePseGold[i] && k < this.fPseGold[i]){
+                            pseGoldResult += singlePairScore;
+                        }
+                    }
+                }
+                
+                result += (Math.log(pseGoldResult) - Math.log(allPairs));
+            }
             
-            return -3*x*x - 4*y*y + 2*x - 4*y + 18 + this.A;
-            
+            return result;
         }
         
         public void getValueGradient(double[] gradient) {
+            for (int m = 0; m < this.parameters.length; m++){
+                gradient[m] = 0.0;
+            }
             
-            gradient[0] = -6 * parameters[0] + 2;
-            gradient[1] = -8 * parameters[1] - 4;
-            
+            for (int i = 0; i < this.A.length; i++){
+                double pseGoldResultDenom = 0.0;
+                double allPairsDenom = 0.0;
+                double[] pseGoldResultNumer = new double[this.parameters.length];
+                double[] allPairsNumer = new double[this.parameters.length];
+                
+                for (int j = 0; j < this.A[0][0].length; j++){
+                    for (int k = 0; k < this.A[0][0][0].length; k++){
+                        double singlePairScore = 1.0;
+                        
+                        for (int m = 0; m < this.parameters.length; m++){
+                            singlePairScore *= Math.exp(this.A[i][m][j][k] * this.parameters[m]);
+                        }
+                        
+                        allPairsDenom += singlePairScore;
+                        if (j < this.ePseGold[i] && k < this.fPseGold[i]){
+                            pseGoldResultDenom += singlePairScore;
+                        }
+                        
+                        for (int m = 0; m < this.parameters.length; m++){
+                            allPairsNumer[m] += A[i][m][j][k]*singlePairScore;
+                            if (j < this.ePseGold[i] && k < this.fPseGold[i]){
+                                pseGoldResultNumer[m] += A[i][m][j][k]*singlePairScore;
+                            }
+                        }
+                    }
+                }
+                
+                for (int m = 0; m < this.parameters.length; m++){
+                    gradient[m] += (pseGoldResultNumer[m]/pseGoldResultDenom - allPairsNumer[m]/allPairsDenom);
+                }
+            }
         }
         
         // The following get/set methods satisfy the Optimizable interface

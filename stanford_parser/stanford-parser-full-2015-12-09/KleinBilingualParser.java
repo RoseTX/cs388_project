@@ -31,6 +31,8 @@ import edu.stanford.nlp.util.logging.Redwood;
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.Sentence;
 import edu.stanford.nlp.trees.Tree;
+import edu.stanford.nlp.util.ScoredObject;
+import edu.stanford.nlp.parser.lexparser.LexicalizedParserQuery;
 
 import java.io.*;
 import java.util.*;
@@ -59,7 +61,7 @@ public class KleinBilingualParser extends LexicalizedParser{
     public Options getOp() { return op; }
     @Override
     public void setOptionFlags(String... flags) {
-      op.setOptions(flags);
+        op.setOptions(flags);
     }
     
     public KleinBilingualParser(Lexicon lex, BinaryGrammar bg, UnaryGrammar ug, DependencyGrammar dg, Index<String> stateIndex, Index<String> wordIndex, Index<String> tagIndex, Options op) {
@@ -68,225 +70,253 @@ public class KleinBilingualParser extends LexicalizedParser{
     }
     
     public static void main(String[] args) {
-    boolean trainF = false;
-    boolean trainE = false;
-    boolean saveToSerializedFile = false;
-    boolean saveToTextFile = false;
-    String serializedInputFileOrUrl = null;
-    String textInputFileOrUrl = null;
-    String serializedOutputFileOrUrl = null;
-    String textOutputFileOrUrl = null;
-    String treebankPathF = null;
-    Treebank testTreebankF = null;
-    Treebank tuneTreebankF = null;
-    String testPathF = null;
-    FileFilter testFilterF = null;
-    String treebankPathE = null;
-    Treebank testTreebankE = null;
-    Treebank tuneTreebankE = null;
-    String testPathE = null;
-    FileFilter testFilterE = null;
-    String tunePath = null;
-    FileFilter tuneFilter = null;
-    FileFilter trainFilterF = null;
-    FileFilter trainFilterE = null;
-    String secondaryTreebankPath = null;
-    double secondaryTreebankWeight = 1.0;
-    FileFilter secondaryTrainFilter = null;
-
-    // variables needed to process the files to be parsed
-    TokenizerFactory<? extends HasWord> tokenizerFactory = null;
-    String tokenizerOptions = null;
-    String tokenizerFactoryClass = null;
-    String tokenizerMethod = null;
-    boolean tokenized = false; // whether or not the input file has already been tokenized
-    Function<List<HasWord>, List<HasWord>> escaper = null;
-    String tagDelimiter = null;
-    String sentenceDelimiter = null;
-    String elementDelimiter = null;
-    int argIndex = 0;
-    if (args.length < 1) {
-      log.info("Basic usage (see Javadoc for more): java edu.stanford.nlp.parser.lexparser.LexicalizedParser parserFileOrUrl filename*");
-      return;
-    }
-
-    Options fOp = new Options();
-    Options eOp = new Options();
-    List<String> optionArgs = new ArrayList<>();
-    String encodingF = null;
-    // while loop through option arguments
-    while (!args[argIndex].equals("--") && argIndex < args.length && args[argIndex].charAt(0) == '-') {
-      if (args[argIndex].equalsIgnoreCase("-train") ||
-          args[argIndex].equalsIgnoreCase("-trainTreebank")) {
-        trainF = true;
-        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
-        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        treebankPathF = treebankDescription.first();
-        trainFilterF = treebankDescription.second();
-      } else if (args[argIndex].equalsIgnoreCase("-tLPP") && (argIndex + 1 < args.length)) {
-        try {
-          fOp.tlpParams = (TreebankLangParserParams) Class.forName(args[argIndex + 1]).newInstance();
-        } catch (ClassNotFoundException e) {
-          log.info("Class not found: " + args[argIndex + 1]);
-          throw new RuntimeException(e);
-        } catch (InstantiationException e) {
-          log.info("Couldn't instantiate: " + args[argIndex + 1] + ": " + e.toString());
-          throw new RuntimeException(e);
-        } catch (IllegalAccessException e) {
-          log.info("Illegal access" + e);
-          throw new RuntimeException(e);
+        boolean trainF = false;
+        boolean trainE = false;
+        boolean saveToSerializedFile = false;
+        boolean saveToTextFile = false;
+        String serializedInputFileOrUrl = null;
+        String textInputFileOrUrl = null;
+        String serializedOutputFileOrUrl = null;
+        String textOutputFileOrUrl = null;
+        String treebankPathF = null;
+        Treebank testTreebankF = null;
+        Treebank tuneTreebankF = null;
+        String testPathF = null;
+        FileFilter testFilterF = null;
+        String treebankPathE = null;
+        Treebank testTreebankE = null;
+        Treebank tuneTreebankE = null;
+        String testPathE = null;
+        FileFilter testFilterE = null;
+        String tunePath = null;
+        FileFilter tuneFilter = null;
+        FileFilter trainFilterF = null;
+        FileFilter trainFilterE = null;
+        String secondaryTreebankPath = null;
+        double secondaryTreebankWeight = 1.0;
+        FileFilter secondaryTrainFilter = null;
+        
+        // variables needed to process the files to be parsed
+        TokenizerFactory<? extends HasWord> tokenizerFactory = null;
+        String tokenizerOptions = null;
+        String tokenizerFactoryClass = null;
+        String tokenizerMethod = null;
+        boolean tokenized = false; // whether or not the input file has already been tokenized
+        Function<List<HasWord>, List<HasWord>> escaper = null;
+        String tagDelimiter = null;
+        String sentenceDelimiter = null;
+        String elementDelimiter = null;
+        int argIndex = 0;
+        if (args.length < 1) {
+            log.info("Basic usage (see Javadoc for more): java edu.stanford.nlp.parser.lexparser.LexicalizedParser parserFileOrUrl filename*");
+            return;
         }
-        argIndex += 2;
-      } else if (args[argIndex].equalsIgnoreCase("-encoding")) {
-        // sets encoding for TreebankLangParserParams
-        // redone later to override any serialized parser one read in
-        encodingF = args[argIndex + 1];
-        fOp.tlpParams.setInputEncoding(encodingF);
-        fOp.tlpParams.setOutputEncoding(encodingF);
-        argIndex += 2;
-      } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
-                 args[argIndex].equalsIgnoreCase("-testTreebank") ||
-                 args[argIndex].equalsIgnoreCase("-test")) {
-        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
-        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        testPathF = treebankDescription.first();
-        testFilterF = treebankDescription.second();
-      } else {
-        int oldIndex = argIndex;
-        argIndex = fOp.setOptionOrWarn(args, argIndex);
-        optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
-      }
-
-      System.out.println(argIndex + " " + args.length);
-    } // end while loop through arguments for french
-
-    argIndex++;//go to english arguments
-
-    while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
-      if (args[argIndex].equalsIgnoreCase("-train") ||
-          args[argIndex].equalsIgnoreCase("-trainTreebank")) {
-        trainE = true;
-        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
-        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        treebankPathE = treebankDescription.first();
-        trainFilterE = treebankDescription.second();
-      } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
-                 args[argIndex].equalsIgnoreCase("-testTreebank") ||
-                 args[argIndex].equalsIgnoreCase("-test")) {
-        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
-        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-        testPathE = treebankDescription.first();
-        testFilterE = treebankDescription.second();
-      } else {
-        int oldIndex = argIndex;
-        argIndex = eOp.setOptionOrWarn(args, argIndex);
-        optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
-      }
-    } // end while loop through arguments for english
-
-//    if (!train && fOp.testOptions.verbose) {
-//      StringUtils.logInvocationString(log, args);
-//    }
-    LexicalizedParser lpF; // always initialized in next if-then-else block
-    LexicalizedParser lpE;
-    //TRAIN A PARSER
-      // so we train a parser using the treebank
-      GrammarCompactor compactorF = null;
-      GrammarCompactor compactorE = null;
-      if (fOp.trainOptions.compactGrammar() == 3) {
-        compactorF = new ExactGrammarCompactor(fOp, false, false);
-      }
-      if (eOp.trainOptions.compactGrammar() == 3) {
-        compactorE = new ExactGrammarCompactor(eOp, false, false);
-      }
-
-      Treebank trainTreebankF = makeTreebank(treebankPathF, fOp, trainFilterF);
-      Treebank trainTreebankE = makeTreebank(treebankPathE, eOp, trainFilterE);
-
-      fOp.testOptions.quietEvaluation = true;
-      eOp.testOptions.quietEvaluation = true;
-
-      lpF = getParserFromTreebank(trainTreebankF, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
-      lpE = getParserFromTreebank(trainTreebankE, null, secondaryTreebankWeight, compactorE, eOp, tuneTreebankE, null);
-
-      //GET FRENCH TREEBANK
-
-    // the following has to go after reading parser to make sure
-    // op and tlpParams are the same for train and test
-    // THIS IS BUTT UGLY BUT IT STOPS USER SPECIFIED ENCODING BEING
-    // OVERWRITTEN BY ONE SPECIFIED IN SERIALIZED PARSER
-    if (encodingF != null) {
-      fOp.tlpParams.setInputEncoding(encodingF);
-      fOp.tlpParams.setOutputEncoding(encodingF);
-    }
-
-    if (testFilterF != null || testPathF != null) {
-      if (testPathF == null) {
-        if (treebankPathF == null) {
-          throw new RuntimeException("No test treebank path specified...");
-        } else {
-          log.info("No test treebank path specified.  Using train path: \"" + treebankPathF + '\"');
-          testPathF = treebankPathF;
+        
+        Options fOp = new Options();
+        Options eOp = new Options();
+        List<String> optionArgs = new ArrayList<>();
+        String encodingF = null;
+        // while loop through option arguments
+        while (!args[argIndex].equals("--") && argIndex < args.length && args[argIndex].charAt(0) == '-') {
+            if (args[argIndex].equalsIgnoreCase("-train") ||
+                args[argIndex].equalsIgnoreCase("-trainTreebank")) {
+                trainF = true;
+                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
+                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                treebankPathF = treebankDescription.first();
+                trainFilterF = treebankDescription.second();
+            } else if (args[argIndex].equalsIgnoreCase("-tLPP") && (argIndex + 1 < args.length)) {
+                try {
+                    fOp.tlpParams = (TreebankLangParserParams) Class.forName(args[argIndex + 1]).newInstance();
+                } catch (ClassNotFoundException e) {
+                    log.info("Class not found: " + args[argIndex + 1]);
+                    throw new RuntimeException(e);
+                } catch (InstantiationException e) {
+                    log.info("Couldn't instantiate: " + args[argIndex + 1] + ": " + e.toString());
+                    throw new RuntimeException(e);
+                } catch (IllegalAccessException e) {
+                    log.info("Illegal access" + e);
+                    throw new RuntimeException(e);
+                }
+                argIndex += 2;
+            } else if (args[argIndex].equalsIgnoreCase("-encoding")) {
+                // sets encoding for TreebankLangParserParams
+                // redone later to override any serialized parser one read in
+                encodingF = args[argIndex + 1];
+                fOp.tlpParams.setInputEncoding(encodingF);
+                fOp.tlpParams.setOutputEncoding(encodingF);
+                argIndex += 2;
+            } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
+                       args[argIndex].equalsIgnoreCase("-testTreebank") ||
+                       args[argIndex].equalsIgnoreCase("-test")) {
+                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                testPathF = treebankDescription.first();
+                testFilterF = treebankDescription.second();
+            } else {
+                int oldIndex = argIndex;
+                argIndex = fOp.setOptionOrWarn(args, argIndex);
+                optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
+            }
+            
+            System.out.println(argIndex + " " + args.length);
+        } // end while loop through arguments for french
+        
+        argIndex++;//go to english arguments
+        
+        while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
+            if (args[argIndex].equalsIgnoreCase("-train") ||
+                args[argIndex].equalsIgnoreCase("-trainTreebank")) {
+                trainE = true;
+                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
+                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                treebankPathE = treebankDescription.first();
+                trainFilterE = treebankDescription.second();
+            } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
+                       args[argIndex].equalsIgnoreCase("-testTreebank") ||
+                       args[argIndex].equalsIgnoreCase("-test")) {
+                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                testPathE = treebankDescription.first();
+                testFilterE = treebankDescription.second();
+            } else {
+                int oldIndex = argIndex;
+                argIndex = eOp.setOptionOrWarn(args, argIndex);
+                optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
+            }
+        } // end while loop through arguments for english
+        
+        //    if (!train && fOp.testOptions.verbose) {
+        //      StringUtils.logInvocationString(log, args);
+        //    }
+        LexicalizedParser lpF; // always initialized in next if-then-else block
+        LexicalizedParser lpE;
+        //TRAIN A PARSER
+        // so we train a parser using the treebank
+        GrammarCompactor compactorF = null;
+        GrammarCompactor compactorE = null;
+        if (fOp.trainOptions.compactGrammar() == 3) {
+            compactorF = new ExactGrammarCompactor(fOp, false, false);
         }
-      }
-      testTreebankF = fOp.tlpParams.testMemoryTreebank();
-      testTreebankF.loadPath(testPathF, testFilterF);
-    }
-
-    fOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(fOp.tlpParams.sisterSplitters()));
-
-    //GET ENGLISH TREEBANK
-
-    if (testFilterE != null || testPathE != null) {
-      if (testPathE == null) {
-        if (treebankPathE == null) {
-          throw new RuntimeException("No test treebank path specified...");
-        } else {
-          log.info("No test treebank path specified.  Using train path: \"" + treebankPathE + '\"');
-          testPathE = treebankPathE;
+        if (eOp.trainOptions.compactGrammar() == 3) {
+            compactorE = new ExactGrammarCompactor(eOp, false, false);
         }
-      }
-      testTreebankE = eOp.tlpParams.testMemoryTreebank();
-      testTreebankE.loadPath(testPathE, testFilterE);
-    }
-
-    eOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(eOp.tlpParams.sisterSplitters()));
-
-    //PARALLEL ALIGNMENT FEATURE CALCULATION
-
-int i = 0;
-    Iterator<Tree> eTrees = testTreebankE.iterator();
-    Iterator<Tree> fTrees = testTreebankF.iterator();
-
-    while(eTrees.hasNext() && fTrees.hasNext()){
-      Tree fTree = fTrees.next();
-      Tree eTree = eTrees.next();
-
-      List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
-      List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
-
-      Tree fTreeParsed = lpF.parseTree(sentenceF);
-      Tree eTreeParsed = lpE.parseTree(sentenceE);
-
-      //BEGIN CALCULATION OF FEATURES
-
-      HashMap<Tree, Tree> alignment = getSampleNodeAlignment(eTreeParsed, fTreeParsed);
-
-      System.out.println("=================================");
-      for (Map.Entry entry : alignment.entrySet()){
-        System.out.println(numChildren((Tree) entry.getKey(), (Tree) entry.getValue()));
-      }
-      System.out.println("=================================");
-    }
+        
+        Treebank trainTreebankF = makeTreebank(treebankPathF, fOp, trainFilterF);
+        Treebank trainTreebankE = makeTreebank(treebankPathE, eOp, trainFilterE);
+        
+        fOp.testOptions.quietEvaluation = true;
+        eOp.testOptions.quietEvaluation = true;
+        
+        lpF = getParserFromTreebank(trainTreebankF, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
+        lpE = getParserFromTreebank(trainTreebankE, null, secondaryTreebankWeight, compactorE, eOp, tuneTreebankE, null);
+        
+        //GET FRENCH TREEBANK
+        
+        // the following has to go after reading parser to make sure
+        // op and tlpParams are the same for train and test
+        // THIS IS BUTT UGLY BUT IT STOPS USER SPECIFIED ENCODING BEING
+        // OVERWRITTEN BY ONE SPECIFIED IN SERIALIZED PARSER
+        if (encodingF != null) {
+            fOp.tlpParams.setInputEncoding(encodingF);
+            fOp.tlpParams.setOutputEncoding(encodingF);
+        }
+        
+        if (testFilterF != null || testPathF != null) {
+            if (testPathF == null) {
+                if (treebankPathF == null) {
+                    throw new RuntimeException("No test treebank path specified...");
+                } else {
+                    log.info("No test treebank path specified.  Using train path: \"" + treebankPathF + '\"');
+                    testPathF = treebankPathF;
+                }
+            }
+            testTreebankF = fOp.tlpParams.testMemoryTreebank();
+            testTreebankF.loadPath(testPathF, testFilterF);
+        }
+        
+        fOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(fOp.tlpParams.sisterSplitters()));
+        
+        //GET ENGLISH TREEBANK
+        
+        if (testFilterE != null || testPathE != null) {
+            if (testPathE == null) {
+                if (treebankPathE == null) {
+                    throw new RuntimeException("No test treebank path specified...");
+                } else {
+                    log.info("No test treebank path specified.  Using train path: \"" + treebankPathE + '\"');
+                    testPathE = treebankPathE;
+                }
+            }
+            testTreebankE = eOp.tlpParams.testMemoryTreebank();
+            testTreebankE.loadPath(testPathE, testFilterE);
+        }
+        
+        eOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(eOp.tlpParams.sisterSplitters()));
+        
+        //PARALLEL ALIGNMENT FEATURE CALCULATION
+        
+        Iterator<Tree> eTrees = testTreebankE.iterator();
+        Iterator<Tree> fTrees = testTreebankF.iterator();
+        int kE = 10;
+        int kF = 10;
+        int numFeatures = 2;
+        //features are used in the order they are defined
+        double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
+        int ePsGold[] = new int[testTreebankE.size()];
+        int fPsGold[] = new int[testTreebankF.size()];
+        
+        int i = 0;
+        while(eTrees.hasNext() && fTrees.hasNext()){
+            Tree fTree = fTrees.next();
+            Tree eTree = eTrees.next();
+            
+            List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
+            List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
+            
+            LexicalizedParserQuery lpqE = (LexicalizedParserQuery) lpE.parserQuery();
+            LexicalizedParserQuery lpqF = (LexicalizedParserQuery) lpF.parserQuery();
+            
+            lpqE.parse(sentenceE);
+            lpqF.parse(sentenceF);
+            
+            List<ScoredObject<Tree>> kBestF = lpqF.getKBestPCFGParses(kF);
+            List<ScoredObject<Tree>> kBestE = lpqE.getKBestPCFGParses(kE);
+            
+            fPsGold[i] = 3;
+            ePsGold[i] = 3;
+            
+            int j = 0;
+            int k = 0;
+            
+            for (ScoredObject<Tree> eScoredObj : kBestE){
+                k = 0;
+                for (ScoredObject<Tree> fScoredObj : kBestF){
+                    HashMap<Tree, Tree> alignment = getSampleNodeAlignment(eScoredObj.object(), fScoredObj.object());
+                    
+                    for (Map.Entry entry : alignment.entrySet()){
+                        Tree nodeF = (Tree) entry.getKey();
+                        Tree nodeE = (Tree) entry.getValue();
+                        
+                        A[i][0][j][k] += (double) spanDiff(nodeF, nodeE);
+                        A[i][1][j][k] += (double) numChildren(nodeF, nodeE);
+                    }
+                    
+                    k++;
+                }
+                j++;
+            }
+            i++;
+        }
         
         
         ///////////////////////
         //
-        //  MALLET trial run
+        //  MALLET optimizer
         //
         ///////////////////////
         
-        OptimizerExample optimizable = new OptimizerExample(0, 0);
+        OptimizerExample optimizable = new OptimizerExample(0, 0, 4.4);
         Optimizer optimizer = new LimitedMemoryBFGS(optimizable);
         
         boolean converged = false;
@@ -303,71 +333,70 @@ int i = 0;
         
         System.out.println(optimizable.getParameter(0) + ", " +
                            optimizable.getParameter(1));
-
-  } // end main
+        
+    } // end main
     
-/////////////////////////
-//
-//  FEATURES
-//
-/////////////////////////
-
-private static int spanDiff (Tree nodeF, Tree nodeE){
-  System.out.print(nodeF.getLeaves().size() + " " + nodeE.getLeaves().size() + " : ");
-  return Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size());
-}
-
-//assuming this is an indicator that checks if the number of children is the same or not
-private static int numChildren (Tree nodeF, Tree nodeE){
-  if (nodeF.numChildren() == nodeE.numChildren()){
-    return 1;
-  }
-  else {
-    return 0;
-  }
-}
-
-/////////////////////////
-/////////////////////////
-
-
-/////////////////////////
-//
-//  KLEIN FUNCTIONS
-//
-/////////////////////////
-
-// assume alignment from french nodes to english nodes
-// omitting leaf node alignments - even if one of the node is a leaf
-// the below function assumes 
-private static HashMap<Tree, Tree> getSampleNodeAlignment(Tree eParseTree, Tree fParseTree){
-  HashMap<Tree, Tree> alignment = new HashMap<>();
-
-  Iterator<Tree> eSubtrees = eParseTree.iterator();
-  for (Tree fSubTree : fParseTree){
-    if (!eSubtrees.hasNext()){
-      break;
+    /////////////////////////
+    //
+    //  FEATURES
+    //
+    /////////////////////////
+    
+    private static int spanDiff (Tree nodeF, Tree nodeE){
+        return Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size());
     }
-    else {
-      Tree eSubTree = eSubtrees.next();
-      if (!fSubTree.isLeaf() && !eSubTree.isLeaf()){
-        alignment.put(fSubTree, eSubTree);
-      }
+    
+    //assuming this is an indicator that checks if the number of children is the same or not
+    private static int numChildren (Tree nodeF, Tree nodeE){
+        if (nodeF.numChildren() == nodeE.numChildren()){
+            return 1;
+        }
+        else {
+            return 0;
+        }
     }
-  }
-
-  return alignment;
-}
-
-/////////////////////////
-/////////////////////////
+    
+    /////////////////////////
+    /////////////////////////
     
     
-/////////////////////////
-//
-//  MALLET
-//
-/////////////////////////
+    /////////////////////////
+    //
+    //  KLEIN FUNCTIONS
+    //
+    /////////////////////////
+    
+    // assume alignment from french nodes to english nodes
+    // omitting leaf node alignments - even if one of the node is a leaf
+    // the below function assumes
+    private static HashMap<Tree, Tree> getSampleNodeAlignment(Tree eParseTree, Tree fParseTree){
+        HashMap<Tree, Tree> alignment = new HashMap<>();
+        
+        Iterator<Tree> eSubtrees = eParseTree.iterator();
+        for (Tree fSubTree : fParseTree){
+            if (!eSubtrees.hasNext()){
+                break;
+            }
+            else {
+                Tree eSubTree = eSubtrees.next();
+                if (!fSubTree.isLeaf() && !eSubTree.isLeaf()){
+                    alignment.put(fSubTree, eSubTree);
+                }
+            }
+        }
+        
+        return alignment;
+    }
+    
+    /////////////////////////
+    /////////////////////////
+    
+    
+    /////////////////////////
+    //
+    //  MALLET
+    //
+    /////////////////////////
     
     private static class OptimizerExample implements Optimizable.ByGradientValue {
         
@@ -377,10 +406,13 @@ private static HashMap<Tree, Tree> getSampleNodeAlignment(Tree eParseTree, Tree 
         
         double[] parameters;
         
-        public OptimizerExample(double x, double y) {
+        double A;
+        
+        public OptimizerExample(double x, double y, double A) {
             parameters = new double[2];
             parameters[0] = x;
             parameters[1] = y;
+            this.A = A;
         }
         
         public double getValue() {
@@ -388,7 +420,7 @@ private static HashMap<Tree, Tree> getSampleNodeAlignment(Tree eParseTree, Tree 
             double x = parameters[0];
             double y = parameters[1];
             
-            return -3*x*x - 4*y*y + 2*x - 4*y + 18;
+            return -3*x*x - 4*y*y + 2*x - 4*y + 18 + this.A;
             
         }
         
@@ -417,51 +449,51 @@ private static HashMap<Tree, Tree> getSampleNodeAlignment(Tree eParseTree, Tree 
         }
     }
     
-/////////////////////////
-/////////////////////////
-
-
-///////////////////////////////
-//
-//  STANFORD PARSER FUNCTIONS
-//
-///////////////////////////////
-
+    /////////////////////////
+    /////////////////////////
+    
+    
+    ///////////////////////////////
+    //
+    //  STANFORD PARSER FUNCTIONS
+    //
+    ///////////////////////////////
+    
     private static Treebank makeTreebank(String treebankPath, Options op, FileFilter filt) {
-    log.info("Training a parser from treebank dir: " + treebankPath);
-    Treebank trainTreebank = op.tlpParams.diskTreebank();
-    log.info("Reading trees...");
-    if (filt == null) {
-      trainTreebank.loadPath(treebankPath);
-    } else {
-      trainTreebank.loadPath(treebankPath, filt);
+        log.info("Training a parser from treebank dir: " + treebankPath);
+        Treebank trainTreebank = op.tlpParams.diskTreebank();
+        log.info("Reading trees...");
+        if (filt == null) {
+            trainTreebank.loadPath(treebankPath);
+        } else {
+            trainTreebank.loadPath(treebankPath, filt);
+        }
+        
+        Timing.tick("done [read " + trainTreebank.size() + " trees].");
+        return trainTreebank;
     }
-
-    Timing.tick("done [read " + trainTreebank.size() + " trees].");
-    return trainTreebank;
-  }
     
     private static DiskTreebank makeSecondaryTreebank(String treebankPath, Options op, FileFilter filt) {
-    log.info("Additionally training using secondary disk treebank: " + treebankPath + ' ' + filt);
-    DiskTreebank trainTreebank = op.tlpParams.diskTreebank();
-    log.info("Reading trees...");
-    if (filt == null) {
-      trainTreebank.loadPath(treebankPath);
-    } else {
-      trainTreebank.loadPath(treebankPath, filt);
+        log.info("Additionally training using secondary disk treebank: " + treebankPath + ' ' + filt);
+        DiskTreebank trainTreebank = op.tlpParams.diskTreebank();
+        log.info("Reading trees...");
+        if (filt == null) {
+            trainTreebank.loadPath(treebankPath);
+        } else {
+            trainTreebank.loadPath(treebankPath, filt);
+        }
+        Timing.tick("done [read " + trainTreebank.size() + " trees].");
+        return trainTreebank;
     }
-    Timing.tick("done [read " + trainTreebank.size() + " trees].");
-    return trainTreebank;
-  }
-  
+    
     private static void printOptions(boolean train, Options op) {
-    op.display();
-    if (train) {
-      op.trainOptions.display();
-    } else {
-      op.testOptions.display();
+        op.display();
+        if (train) {
+            op.trainOptions.display();
+        } else {
+            op.testOptions.display();
+        }
+        op.tlpParams.display();
     }
-    op.tlpParams.display();
-  }
     
 }

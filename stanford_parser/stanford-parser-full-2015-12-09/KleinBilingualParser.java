@@ -6,6 +6,7 @@ import edu.stanford.nlp.parser.lexparser.Options;
 import edu.stanford.nlp.parser.lexparser.UnaryGrammar;
 import edu.stanford.nlp.trees.Treebank;
 import edu.stanford.nlp.ling.HasWord;
+import edu.stanford.nlp.ling.Word;
 import edu.stanford.nlp.ling.TaggedWord;
 import edu.stanford.nlp.parser.common.ArgUtils;
 import edu.stanford.nlp.parser.common.ParserQuery;
@@ -27,6 +28,7 @@ import edu.stanford.nlp.util.StringUtils;
 import edu.stanford.nlp.util.Timing;
 import edu.stanford.nlp.util.Triple;
 import edu.stanford.nlp.util.logging.Redwood;
+import edu.stanford.nlp.util.IntPair;
 
 import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.ling.Sentence;
@@ -254,10 +256,29 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         eOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(eOp.tlpParams.sisterSplitters()));
         
+        //WORD ALIGNMENT 
+
+
+        //HARD CODED NEED TO CHANGE to ARGUMENT TO PARSER
+        ArrayList<TreeMap<Integer,ArrayList<Integer>>> alignments=null;
+        String alignFile="../../berkeleyaligner/output/test.align";
+        try{
+           
+           AlignmentProcessor p = new AlignmentProcessor(alignFile);
+           alignments = p.createAlignments();
+          
+          }catch(FileNotFoundException e){ throw new RuntimeException(e);
+          }catch(IOException e){throw new RuntimeException(e);}
+       
+
+
+
         //PARALLEL ALIGNMENT FEATURE CALCULATION
         
         Iterator<Tree> eTrees = testTreebankE.iterator();
         Iterator<Tree> fTrees = testTreebankF.iterator();
+        Iterator<TreeMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
+
         int kE = 10;
         int kF = 10;
         int numFeatures = 4;
@@ -267,12 +288,16 @@ public class KleinBilingualParser extends LexicalizedParser{
         int fPsGold[] = new int[testTreebankF.size()];
         
         int i = 0;
-        while(eTrees.hasNext() && fTrees.hasNext()){
+        while(eTrees.hasNext() && fTrees.hasNext() && alignIterator.hasNext()){
+
+            TreeMap<Integer,ArrayList<Integer>> alignMap = alignIterator.next();
             Tree fTree = fTrees.next();
             Tree eTree = eTrees.next();
             
             List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
             List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
+
+
             
             LexicalizedParserQuery lpqE = (LexicalizedParserQuery) lpE.parserQuery();
             LexicalizedParserQuery lpqF = (LexicalizedParserQuery) lpF.parserQuery();
@@ -301,6 +326,12 @@ public class KleinBilingualParser extends LexicalizedParser{
                     for (Map.Entry entry : alignment.entrySet()){
                         Tree nodeF = (Tree) entry.getKey();
                         Tree nodeE = (Tree) entry.getValue();
+                        nodeF.setSpans();
+                        nodeE.setSpans();
+
+                        int inBoth_feature=insideBoth(nodeF,nodeE, alignMap);
+                        int inSrcOutTgt_feature= insideSrcOutsideTgt(nodeF,nodeE, alignMap);
+                        int inTgtOutSrc_feature= insideTgtOutsideSrc(nodeF,nodeE, alignMap);
                         
                         A[i][2][j][k] += (double) spanDiff(nodeF, nodeE);
                         A[i][3][j][k] += (double) numChildren(nodeF, nodeE);
@@ -382,6 +413,105 @@ public class KleinBilingualParser extends LexicalizedParser{
             return 0;
         }
     }
+
+private static int insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+{
+  
+    IntPair spanF=nodeF.getSpan();
+    IntPair spanE=nodeF.getSpan();
+    /*
+    List<Word> sentenceF = nodeF.yieldWords();
+    List<Word> sentenceE = nodeE.yieldWords();
+
+          for(int h=0;h<sentenceF.size();h++)
+              System.out.print(sentenceF.get(h)+" ");
+            System.out.println();
+
+            for(int h=0;h<sentenceE.size();h++)
+              System.out.print(sentenceE.get(h)+" ");
+            System.out.println();    
+    */
+
+   /* if(spanF.getSource()!=spanE.getSource() || spanF.getTarget()!=spanE.getTarget())
+    {
+      System.out.println("DIFFERENT");
+        System.out.println(spanF.getSource()+" "+spanF.getTarget());
+      System.out.println(spanE.getSource()+" "+spanE.getTarget());
+    }
+    */
+
+    int sum=0;
+    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
+    {
+      for (int e=spanE.getSource();e<=spanE.getTarget();e++)
+      {
+        //System.out.println("indices:"+f+" "+e);
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+
+    return sum;
+}
+
+private static int insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+{
+  
+    IntPair spanF=nodeF.getSpan();
+    IntPair spanE=nodeF.getSpan();
+
+    int sum=0;
+    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
+    {
+      for (int e=0;e<spanE.getSource();e++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
+    {
+      for (int e=spanE.getTarget()+1;e<nodeE.size();e++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+    return sum;
+}
+
+
+private static int insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+{
+  
+    IntPair spanF=nodeF.getSpan();
+    IntPair spanE=nodeF.getSpan();
+
+    int sum=0;
+    for (int e=spanE.getSource();e<=spanE.getTarget();e++)
+    {
+      for (int f=0;e<spanF.getSource();f++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+
+    for (int e=spanE.getSource();e<=spanE.getTarget();e++)
+    {
+      for (int f=spanF.getTarget()+1;f<nodeE.size();f++)
+      {
+        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
+          sum++;
+      }
+    }
+    return sum;
+}
+
+
     
     /////////////////////////
     /////////////////////////

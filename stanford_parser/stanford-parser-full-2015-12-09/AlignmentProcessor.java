@@ -35,15 +35,17 @@ public class AlignmentProcessor {
             //System.out.println(numWords);
 
             HashMap<Integer,ArrayList<Integer>> align = new HashMap<Integer,ArrayList<Integer>>();
-            for(String word:pairs)
-            {
+            if (!line.equals("")){
+                for(String word:pairs)
+                {
 
-                int index1 = Integer.parseInt(word.split("-")[0]);
-                int index2 = Integer.parseInt(word.split("-")[1]);
-                if(!align.containsKey(index1))
-                    align.put(index1,new ArrayList<Integer>());
-                align.get(index1).add(index2);
+                    int index1 = Integer.parseInt(word.split("-")[0]);
+                    int index2 = Integer.parseInt(word.split("-")[1]);
+                    if(!align.containsKey(index1))
+                        align.put(index1,new ArrayList<Integer>());
+                    align.get(index1).add(index2);
 
+                }
             }
             /*
             for(int k: align.keySet())

@@ -35,6 +35,8 @@ import edu.stanford.nlp.ling.Sentence;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.util.ScoredObject;
 import edu.stanford.nlp.parser.lexparser.LexicalizedParserQuery;
+import edu.stanford.nlp.parser.metrics.Evalb;
+import edu.stanford.nlp.parser.metrics.AbstractEval;
 
 import java.io.*;
 import java.util.*;
@@ -309,15 +311,16 @@ public class KleinBilingualParser extends LexicalizedParser{
           }catch(FileNotFoundException e){ throw new RuntimeException(e);
           }catch(IOException e){throw new RuntimeException(e);}
         
+
+        int kE = 10;
+        int kF = 10;
+        int numFeatures = 7;
         do {
             diff = 0.0;
             Iterator<Tree> eTrees = testTreebankE.iterator();
             Iterator<Tree> fTrees = testTreebankF.iterator();
             Iterator<HashMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
 
-            int kE = 10;
-            int kF = 10;
-            int numFeatures = 7;
             //features are used in the order they are defined
             double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
             int ePsGold[] = new int[testTreebankE.size()];
@@ -420,7 +423,103 @@ public class KleinBilingualParser extends LexicalizedParser{
         }
         while (diff > 0.0005);
 
-        
+        //TESTING BILINGUAL PARSER
+
+        Treebank bilingTestTreebankF = trainTreebankF;
+        Treebank bilingTestTreebankE = trainTreebankE;
+        Iterator<Tree> eTreesBling = testTreebankE.iterator();
+        Iterator<Tree> fTreesBling = testTreebankF.iterator();
+
+        boolean runningAveragesF = Boolean.parseBoolean(fOp.testOptions.evals.getProperty("runningAverages"));
+        boolean runningAveragesE = Boolean.parseBoolean(eOp.testOptions.evals.getProperty("runningAverages"));
+
+        AbstractEval pcfgLBf = new Evalb("pcfg LP/LR", runningAveragesF);
+        AbstractEval factLBf = new Evalb("factor LP/LR", runningAveragesF);
+
+        AbstractEval pcfgLBe = new Evalb("pcfg LP/LR", runningAveragesE);
+        AbstractEval factLBe = new Evalb("factor LP/LR", runningAveragesE);
+
+        int i = 0;
+        Iterator<HashMap<Integer,ArrayList<Integer>>> alignIteratorTEST = alignments.iterator();
+        while (eTreesBling.hasNext() && fTreesBling.hasNext() && alignIteratorTEST.hasNext()){
+            HashMap<Integer,ArrayList<Integer>> alignMap = alignIteratorTEST.next();
+
+            Tree fTree = fTreesBling.next();
+            Tree eTree = eTreesBling.next();
+
+            List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
+            List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
+            
+            LexicalizedParserQuery lpqE = (LexicalizedParserQuery) lpE.parserQuery();
+            LexicalizedParserQuery lpqF = (LexicalizedParserQuery) lpF.parserQuery();
+
+            lpqE.parse(sentenceE);
+            lpqF.parse(sentenceF);
+            
+            List<ScoredObject<Tree>> kBestF = lpqF.getKBestPCFGParses(kF);
+            List<ScoredObject<Tree>> kBestE = lpqE.getKBestPCFGParses(kE);
+
+
+            int j = 0;
+            int k = 0;
+
+            double maxScore = -Double.MAX_VALUE;
+            Tree bestFtree = null;
+            Tree bestEtree = null;
+            
+            for (ScoredObject<Tree> eScoredObj : kBestE){
+                k = 0;
+                for (ScoredObject<Tree> fScoredObj : kBestF){
+                    eScoredObj.object().setSpans();
+                    fScoredObj.object().setSpans();
+                    HashMap<Tree, Tree> alignment = getHungarianAlignment(eScoredObj.object(), fScoredObj.object(), weights, alignMap);
+
+                    double currentScore = 0.0;
+                    
+                    for (Map.Entry entry : alignment.entrySet()){
+                        Tree nodeF = (Tree) entry.getKey();
+                        Tree nodeE = (Tree) entry.getValue();
+
+                        currentScore += weights[0]*eScoredObj.score()/100;
+                        currentScore += weights[1]*fScoredObj.score()/100;
+                        currentScore += weights[2]*spanDiff(nodeF, nodeE);
+                        currentScore += weights[3]*numChildren(nodeF, nodeE);
+                        currentScore += weights[4]*insideBoth(nodeF,nodeE, alignMap);
+                        currentScore += weights[5]*insideSrcOutsideTgt(nodeF,nodeE, alignMap);
+                        currentScore += weights[6]*insideTgtOutsideSrc(nodeF,nodeE, alignMap);
+                    }
+
+                    if (currentScore > maxScore) {
+                        maxScore = currentScore;
+
+                        bestFtree = fScoredObj.object();
+                        bestEtree = eScoredObj.object();
+                    }
+                    
+                    k++;
+                }
+                j++;
+            }
+            i++;
+
+            pcfgLBe.evaluate(bestEtree, eTree);
+            factLBe.evaluate(bestEtree, eTree);
+
+            pcfgLBf.evaluate(bestFtree, fTree);
+            factLBf.evaluate(bestFtree, fTree);
+        }
+
+        System.out.println("------------------------");
+        System.out.println("    English Results     ");
+        System.out.println("------------------------");
+        System.out.println("PCFG labeled f1: " + pcfgLBe.getEvalbF1Percent());
+        System.out.println("Factored labeled f1: " + factLBe.getEvalbF1Percent());
+
+        System.out.println("------------------------");
+        System.out.println("     French Results     ");
+        System.out.println("------------------------");
+        System.out.println("PCFG labeled f1: " + pcfgLBf.getEvalbF1Percent());
+        System.out.println("Factored labeled f1: " + factLBf.getEvalbF1Percent());
     } // end main
     
     /////////////////////////

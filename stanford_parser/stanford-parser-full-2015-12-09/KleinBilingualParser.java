@@ -481,12 +481,13 @@ public class KleinBilingualParser extends LexicalizedParser{
     double sum=0;
     for (int f=spanF.getSource();f<=spanF.getTarget();f++)
     {
-      for (int e=spanE.getSource();e<=spanE.getTarget();e++)
-      {
-        //System.out.println("indices:"+f+" "+e);
-        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
-          sum++;
-      }
+        if (alignMap.containsKey(f)){
+            for (Integer alignedIndex : alignMap.get(f)){
+                if (alignedIndex >= spanE.getSource() && alignedIndex <= spanE.getTarget()){
+                    sum++;
+                }
+            }
+        }
     }
 
 
@@ -495,29 +496,21 @@ public class KleinBilingualParser extends LexicalizedParser{
 
 private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, HashMap<Integer,ArrayList<Integer>> alignMap)
 {
-  
     IntPair spanF=nodeF.getSpan();
     IntPair spanE=nodeF.getSpan();
 
     double sum=0;
     for (int f=spanF.getSource();f<=spanF.getTarget();f++)
     {
-      for (int e=0;e<spanE.getSource();e++)
-      {
-        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
-          sum++;
-      }
+        if (alignMap.containsKey(f)){
+            for (Integer alignedIndex : alignMap.get(f)){
+                if (alignedIndex < spanE.getSource() && alignedIndex > spanE.getTarget()){
+                    sum++;
+                }
+            }
+        }
     }
-
-    for (int f=spanF.getSource();f<=spanF.getTarget();f++)
-    {
-      for (int e=spanE.getTarget()+1;e<nodeE.size();e++)
-      {
-        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
-          sum++;
-      }
-    }
-
+    
     return sum;
 }
 
@@ -529,23 +522,28 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Intege
     IntPair spanE=nodeF.getSpan();
 
     double sum=0;
-    for (int e=spanE.getSource();e<=spanE.getTarget();e++)
-    {
-      for (int f=0;e<spanF.getSource();f++)
-      {
-        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
-          sum++;
-      }
+    for (int f=0;f<spanF.getSource();f++)
+  {
+    if (alignMap.containsKey(f)){
+        for (Integer alignedIndex : alignMap.get(f)){
+            if (alignedIndex >= spanE.getSource() && alignedIndex <= spanE.getTarget()){
+                sum++;
+            }
+        }
     }
+  }
 
-    for (int e=spanE.getSource();e<=spanE.getTarget();e++)
-    {
-      for (int f=spanF.getTarget()+1;f<nodeF.size();f++)
-      {
-        if(alignMap.get(f)!=null && alignMap.get(f).contains(e))
-          sum++;
-      }
-    }  
+  for (int f=spanF.getTarget()+1;f<nodeF.size();f++)
+  {
+    if (alignMap.containsKey(f)){
+        for (Integer alignedIndex : alignMap.get(f)){
+            if (alignedIndex >= spanE.getSource() && alignedIndex <= spanE.getTarget()){
+                sum++;
+            }
+        }
+    }
+  } 
+
     return sum;
 }
 
@@ -597,7 +595,9 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Intege
           j = 0;
           for (Tree eSubTree : eParseTree){
             if (!eSubTree.isLeaf()){
+                //IF IT GETS TOO SLOW DON'T COMPUTE WORD ALIGNMENT FEATURES FOR LARGE SENTENCES
               costMatrix[i][j] = weights[2]*spanDiff(fSubTree, eSubTree) + weights[3]*numChildren(fSubTree, eSubTree) + weights[4]*insideBoth(fSubTree,eSubTree, alignMap) + weights[5]*insideSrcOutsideTgt(fSubTree,eSubTree, alignMap) + weights[6]*insideTgtOutsideSrc(fSubTree,eSubTree, alignMap);
+              costMatrix[i][j] = 0 - costMatrix[i][j];
               j++;
             }
           }

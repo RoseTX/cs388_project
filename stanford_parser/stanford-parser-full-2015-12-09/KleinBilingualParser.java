@@ -394,8 +394,8 @@ public class KleinBilingualParser extends LexicalizedParser{
                         HashMap<Tree, Tree> alignment = getHungarianAlignment(eScoredObj.object(), fScoredObj.object(), weights, alignMap);
                         
                         //had to reduce likelihood scores by factor of 10 to keep the optimizer working
-                        A[i][0][j][k] = eScoredObj.score()/1000;
-                        A[i][1][j][k] = fScoredObj.score()/1000;
+                        A[i][0][j][k] = eScoredObj.score()/500;
+                        A[i][1][j][k] = fScoredObj.score()/500;
                         
                         for (Map.Entry entry : alignment.entrySet()){
                             Tree nodeF = (Tree) entry.getKey();
@@ -412,6 +412,7 @@ public class KleinBilingualParser extends LexicalizedParser{
                     }
                     j++;
                 }
+                System.out.println("Sentence " + i);
                 i++;
             }
             
@@ -516,8 +517,8 @@ public class KleinBilingualParser extends LexicalizedParser{
                         Tree nodeF = (Tree) entry.getKey();
                         Tree nodeE = (Tree) entry.getValue();
 
-                        currentScore += weights[0]*eScoredObj.score()/100;
-                        currentScore += weights[1]*fScoredObj.score()/100;
+                        currentScore += weights[0]*eScoredObj.score()/500;
+                        currentScore += weights[1]*fScoredObj.score()/500;
                         currentScore += weights[2]*spanDiff(nodeF, nodeE);
                         currentScore += weights[3]*numChildren(nodeF, nodeE);
                         currentScore += weights[4]*insideBoth(nodeF,nodeE, alignMap);
@@ -574,13 +575,13 @@ public class KleinBilingualParser extends LexicalizedParser{
     }
     
     private static double spanDiff (Tree nodeF, Tree nodeE){
-        return ((double) Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size()))/100;
+        return ((double) Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size()))/50;
     }
     
     //assuming this is an indicator that checks if the number of children is the same or not
     private static double numChildren (Tree nodeF, Tree nodeE){
         if (nodeF.numChildren() == nodeE.numChildren()){
-            return 1.0/10;
+            return 1.0/5;
         }
         else {
             return 0.0;
@@ -626,7 +627,7 @@ public class KleinBilingualParser extends LexicalizedParser{
     }
 
 
-    return sum/10;
+    return sum/5;
 }
 
 private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, HashMap<Integer,ArrayList<Integer>> alignMap)
@@ -646,7 +647,7 @@ private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, HashMap<Intege
         }
     }
     
-    return sum/10;
+    return sum/5;
 }
 
 
@@ -679,7 +680,7 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Intege
     }
   } 
 
-    return sum/10;
+    return sum/5;
 }
 
     

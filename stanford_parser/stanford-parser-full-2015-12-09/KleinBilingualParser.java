@@ -74,6 +74,8 @@ public class KleinBilingualParser extends LexicalizedParser{
     public static void main(String[] args) {
         boolean trainF = false;
         boolean trainE = false;
+        boolean bitrainE = false;
+        boolean bitrainF = false;
         boolean saveToSerializedFile = false;
         boolean saveToTextFile = false;
         String serializedInputFileOrUrl = null;
@@ -97,8 +99,13 @@ public class KleinBilingualParser extends LexicalizedParser{
         String secondaryTreebankPath = null;
         double secondaryTreebankWeight = 1.0;
         FileFilter secondaryTrainFilter = null;
+
         String alignFile=null;
-        
+        String  bitreebankPathE = null;
+        FileFilter bitrainFilterE = null;
+        String  bitreebankPathF = null;
+        FileFilter bitrainFilterF = null;
+
         // variables needed to process the files to be parsed
         TokenizerFactory<? extends HasWord> tokenizerFactory = null;
         String tokenizerOptions = null;
@@ -119,80 +126,97 @@ public class KleinBilingualParser extends LexicalizedParser{
         Options eOp = new Options();
         List<String> optionArgs = new ArrayList<>();
         String encodingF = null;
+
         // while loop through option arguments
         while (!args[argIndex].equals("--") && argIndex < args.length && args[argIndex].charAt(0) == '-') {
-            if (args[argIndex].equalsIgnoreCase("-train") ||
-                args[argIndex].equalsIgnoreCase("-trainTreebank")) {
-                trainF = true;
-                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
-                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                treebankPathF = treebankDescription.first();
-                trainFilterF = treebankDescription.second();
-            } else if (args[argIndex].equalsIgnoreCase("-tLPP") && (argIndex + 1 < args.length)) {
-                try {
-                    fOp.tlpParams = (TreebankLangParserParams) Class.forName(args[argIndex + 1]).newInstance();
-                } catch (ClassNotFoundException e) {
-                    log.info("Class not found: " + args[argIndex + 1]);
-                    throw new RuntimeException(e);
-                } catch (InstantiationException e) {
-                    log.info("Couldn't instantiate: " + args[argIndex + 1] + ": " + e.toString());
-                    throw new RuntimeException(e);
-                } catch (IllegalAccessException e) {
-                    log.info("Illegal access" + e);
-                    throw new RuntimeException(e);
-                }
-                argIndex += 2;
-            } else if (args[argIndex].equalsIgnoreCase("-encoding")) {
-                // sets encoding for TreebankLangParserParams
-                // redone later to override any serialized parser one read in
-                encodingF = args[argIndex + 1];
-                fOp.tlpParams.setInputEncoding(encodingF);
-                fOp.tlpParams.setOutputEncoding(encodingF);
-                argIndex += 2;
-            } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
-                       args[argIndex].equalsIgnoreCase("-testTreebank") ||
-                       args[argIndex].equalsIgnoreCase("-test")) {
-                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
-                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                testPathF = treebankDescription.first();
-                testFilterF = treebankDescription.second();
-            } else {
-                int oldIndex = argIndex;
-                argIndex = fOp.setOptionOrWarn(args, argIndex);
-                optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
-            }
-            
-            System.out.println(argIndex + " " + args.length);
-        } // end while loop through arguments for french
-        
-        argIndex++;//go to english arguments
-        
-        while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
-            if (args[argIndex].equalsIgnoreCase("-train") ||
-                args[argIndex].equalsIgnoreCase("-trainTreebank")) {
-                trainE = true;
-                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
-                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                treebankPathE = treebankDescription.first();
-                trainFilterE = treebankDescription.second();
-            } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
-                       args[argIndex].equalsIgnoreCase("-testTreebank") ||
-                       args[argIndex].equalsIgnoreCase("-test")) {
-                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
-                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                testPathE = treebankDescription.first();
-                testFilterE = treebankDescription.second();
-            } else if (args[argIndex].equalsIgnoreCase("-alignFile"))
-            {
-                Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-alignFile");
-                argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                alignFile=treebankDescription.first();
-            }else {
-                int oldIndex = argIndex;
-                argIndex = eOp.setOptionOrWarn(args, argIndex);
-                optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
-            }
-        } // end while loop through arguments for english
+                    if (args[argIndex].equalsIgnoreCase("-train") ||
+                        args[argIndex].equalsIgnoreCase("-trainTreebank")) {
+                        trainF = true;
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        treebankPathF = treebankDescription.first();
+                        trainFilterF = treebankDescription.second();
+                    }else if (args[argIndex].equalsIgnoreCase("-bitrain") ||
+                        args[argIndex].equalsIgnoreCase("-bitrainTreebank")) {
+                        bitrainF = true;
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-bitrain");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        bitreebankPathF = treebankDescription.first();
+                        bitrainFilterF = treebankDescription.second();
+                    }  
+                    else if (args[argIndex].equalsIgnoreCase("-tLPP") && (argIndex + 1 < args.length)) {
+                        try {
+                            fOp.tlpParams = (TreebankLangParserParams) Class.forName(args[argIndex + 1]).newInstance();
+                        } catch (ClassNotFoundException e) {
+                            log.info("Class not found: " + args[argIndex + 1]);
+                            throw new RuntimeException(e);
+                        } catch (InstantiationException e) {
+                            log.info("Couldn't instantiate: " + args[argIndex + 1] + ": " + e.toString());
+                            throw new RuntimeException(e);
+                        } catch (IllegalAccessException e) {
+                            log.info("Illegal access" + e);
+                            throw new RuntimeException(e);
+                        }
+                        argIndex += 2;
+                    } else if (args[argIndex].equalsIgnoreCase("-encoding")) {
+                        // sets encoding for TreebankLangParserParams
+                        // redone later to override any serialized parser one read in
+                        encodingF = args[argIndex + 1];
+                        fOp.tlpParams.setInputEncoding(encodingF);
+                        fOp.tlpParams.setOutputEncoding(encodingF);
+                        argIndex += 2;
+                    } else if (args[argIndex].equalsIgnoreCase("-treebank") ||
+                               args[argIndex].equalsIgnoreCase("-testTreebank") ||
+                               args[argIndex].equalsIgnoreCase("-test")) {
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        testPathF = treebankDescription.first();
+                        testFilterF = treebankDescription.second();
+                    } else {
+                        int oldIndex = argIndex;
+                        argIndex = fOp.setOptionOrWarn(args, argIndex);
+                        optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
+                    }
+                    
+                    System.out.println(argIndex + " " + args.length);
+                } // end while loop through arguments for french
+                
+                argIndex++;//go to english arguments
+                
+                while (argIndex < args.length && args[argIndex].charAt(0) == '-') {
+                    if (args[argIndex].equalsIgnoreCase("-train") ||
+                        args[argIndex].equalsIgnoreCase("-trainTreebank")) {
+                        trainE = true;
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-train");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        treebankPathE = treebankDescription.first();
+                        trainFilterE = treebankDescription.second();
+                    }else if (args[argIndex].equalsIgnoreCase("-bitrain") ||
+                        args[argIndex].equalsIgnoreCase("-bitrainTreebank")) {
+                        bitrainE = true;
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-bitrain");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        bitreebankPathE = treebankDescription.first();
+                        bitrainFilterE = treebankDescription.second();
+                    } 
+                     else if (args[argIndex].equalsIgnoreCase("-treebank") ||
+                               args[argIndex].equalsIgnoreCase("-testTreebank") ||
+                               args[argIndex].equalsIgnoreCase("-test")) {
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-test");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        testPathE = treebankDescription.first();
+                        testFilterE = treebankDescription.second();
+                    } else if (args[argIndex].equalsIgnoreCase("-alignFile"))
+                    {
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-alignFile");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        alignFile=treebankDescription.first();
+                    }else {
+                        int oldIndex = argIndex;
+                        argIndex = eOp.setOptionOrWarn(args, argIndex);
+                        optionArgs.addAll(Arrays.asList(args).subList(oldIndex, argIndex));
+                    }
+                } // end while loop through arguments for english
         
         //    if (!train && fOp.testOptions.verbose) {
         //      StringUtils.logInvocationString(log, args);
@@ -290,7 +314,7 @@ public class KleinBilingualParser extends LexicalizedParser{
 
             int kE = 10;
             int kF = 10;
-            int numFeatures = 4;
+            int numFeatures = 7;
             //features are used in the order they are defined
             double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
             int ePsGold[] = new int[testTreebankE.size()];
@@ -337,13 +361,13 @@ public class KleinBilingualParser extends LexicalizedParser{
                             nodeF.setSpans();
                             nodeE.setSpans();
 
-                            double inBoth_feature=insideBoth(nodeF,nodeE, alignMap);
-                            double inSrcOutTgt_feature= insideSrcOutsideTgt(nodeF,nodeE, alignMap);
-                            double inTgtOutSrc_feature= insideTgtOutsideSrc(nodeF,nodeE, alignMap);
-                        
                             
                             A[i][2][j][k] += spanDiff(nodeF, nodeE);
                             A[i][3][j][k] += numChildren(nodeF, nodeE);
+                            A[i][4][j][k] += insideBoth(nodeF,nodeE, alignMap);
+                            A[i][5][j][k] += insideSrcOutsideTgt(nodeF,nodeE, alignMap);
+                            A[i][6][j][k] += insideTgtOutsideSrc(nodeF,nodeE, alignMap);
+
                         }
                         
                         k++;

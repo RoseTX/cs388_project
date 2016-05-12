@@ -102,7 +102,8 @@ public class KleinBilingualParser extends LexicalizedParser{
         double secondaryTreebankWeight = 1.0;
         FileFilter secondaryTrainFilter = null;
 
-        String alignFile=null;
+        String trainAlignFile=null;
+        String testAlignFile=null;
         String  bitrainPathE = null;
         FileFilter bitrainFilterE = null;
         String  bitrainPathF = null;
@@ -210,11 +211,16 @@ public class KleinBilingualParser extends LexicalizedParser{
                         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
                         testPathE = treebankDescription.first();
                         testFilterE = treebankDescription.second();
-                    } else if (args[argIndex].equalsIgnoreCase("-alignFile"))
+                    } else if (args[argIndex].equalsIgnoreCase("-trainAlignFile"))
                     {
-                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-alignFile");
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-trainAlignFile");
                         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                        alignFile=treebankDescription.first();
+                        trainAlignFile=treebankDescription.first();
+                    }else if (args[argIndex].equalsIgnoreCase("-testAlignFile"))
+                    {
+                        Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-testAlignFile");
+                        argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
+                        testAlignFile=treebankDescription.first();
                     }else {
                         int oldIndex = argIndex;
                         argIndex = eOp.setOptionOrWarn(args, argIndex);
@@ -337,12 +343,17 @@ public class KleinBilingualParser extends LexicalizedParser{
         weights[7] = -0.002;
 
 
-        ArrayList<HashMap<Integer,ArrayList<Integer>>> alignments=null;
+        ArrayList<HashMap<Integer,ArrayList<Integer>>> bitrainAlignments=null;
+        ArrayList<HashMap<Integer,ArrayList<Integer>>> testAlignments=null;
         //String alignFile="../../berkeleyaligner/output/test.align";
         try{
            
-           AlignmentProcessor p = new AlignmentProcessor(alignFile);
-           alignments = p.createAlignments();
+           AlignmentProcessor trainAP = new AlignmentProcessor(trainAlignFile);
+           bitrainAlignments = trainAP.createAlignments();
+
+           AlignmentProcessor testAP = new AlignmentProcessor(testAlignFile);
+           testAlignments = testAP.createAlignments();
+
           
           }catch(FileNotFoundException e){ throw new RuntimeException(e);
           }catch(IOException e){throw new RuntimeException(e);}
@@ -356,7 +367,7 @@ public class KleinBilingualParser extends LexicalizedParser{
             diff = 0.0;
             Iterator<Tree> eTrees = bitrainTreebankE.iterator();
             Iterator<Tree> fTrees = bitrainTreebankF.iterator();
-            Iterator<HashMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
+            Iterator<HashMap<Integer,ArrayList<Integer>>> alignIterator = bitrainAlignments.iterator();
             numBigSentences = 0;
             
             //features are used in the order they are defined
@@ -491,7 +502,7 @@ public class KleinBilingualParser extends LexicalizedParser{
         AbstractEval factLBe = new Evalb("factor LP/LR", runningAveragesE);
 
         int i = 0;
-        Iterator<HashMap<Integer,ArrayList<Integer>>> alignIteratorTEST = alignments.iterator();
+        Iterator<HashMap<Integer,ArrayList<Integer>>> alignIteratorTEST = testAlignments.iterator();
         while (eTreesBling.hasNext() && fTreesBling.hasNext() && alignIteratorTEST.hasNext()){
             HashMap<Integer,ArrayList<Integer>> alignMap = alignIteratorTEST.next();
 

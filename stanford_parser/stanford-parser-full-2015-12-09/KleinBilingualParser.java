@@ -394,8 +394,8 @@ public class KleinBilingualParser extends LexicalizedParser{
                         HashMap<Tree, Tree> alignment = getHungarianAlignment(eScoredObj.object(), fScoredObj.object(), weights, alignMap);
                         
                         //had to reduce likelihood scores by factor of 10 to keep the optimizer working
-                        A[i][0][j][k] = eScoredObj.score()/100;
-                        A[i][1][j][k] = fScoredObj.score()/100;
+                        A[i][0][j][k] = eScoredObj.score()/1000;
+                        A[i][1][j][k] = fScoredObj.score()/1000;
                         
                         for (Map.Entry entry : alignment.entrySet()){
                             Tree nodeF = (Tree) entry.getKey();
@@ -574,13 +574,13 @@ public class KleinBilingualParser extends LexicalizedParser{
     }
     
     private static double spanDiff (Tree nodeF, Tree nodeE){
-        return ((double) Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size()))/10;
+        return ((double) Math.abs(nodeF.getLeaves().size() - nodeE.getLeaves().size()))/100;
     }
     
     //assuming this is an indicator that checks if the number of children is the same or not
     private static double numChildren (Tree nodeF, Tree nodeE){
         if (nodeF.numChildren() == nodeE.numChildren()){
-            return 1.0;
+            return 1.0/10;
         }
         else {
             return 0.0;
@@ -626,7 +626,7 @@ public class KleinBilingualParser extends LexicalizedParser{
     }
 
 
-    return sum;
+    return sum/10;
 }
 
 private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, HashMap<Integer,ArrayList<Integer>> alignMap)
@@ -646,7 +646,7 @@ private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, HashMap<Intege
         }
     }
     
-    return sum;
+    return sum/10;
 }
 
 
@@ -679,7 +679,7 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Intege
     }
   } 
 
-    return sum;
+    return sum/10;
 }
 
     

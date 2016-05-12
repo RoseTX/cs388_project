@@ -1,130 +1,50 @@
 main() {
   Execution directory: output
   Preparing Training Data
-  2143 training, 447 test
+  497 training, 447 test
   Training models: 2 stages {
     Training stage 1: MODEL1 and MODEL1 jointly for 2 iterations {
       Initializing forward model
       Initializing reverse model
-      Joint Train: 2143 sentences, jointly {
+      Joint Train: 497 sentences, jointly {
         Iteration 1/2 {
-          Sentence 1/2143
-          Sentence 2/2143
-          Sentence 3/2143
-          Sentence 1431/2143
-          Log-likelihood 1 = -266142.807
-          Log-likelihood 2 = -234688.016
-          ... 2139 lines omitted ...
-        } [1.1s, cum. 1.1s]
+          Sentence 1/497
+          Sentence 2/497
+          Sentence 3/497
+          Log-likelihood 1 = -38580.687
+          Log-likelihood 2 = -34416.832
+          ... 494 lines omitted ...
+        }
         Iteration 2/2 {
-          Sentence 1/2143
-          Sentence 2/2143
-          Sentence 3/2143
-          Log-likelihood 1 = -307200.916
-          Log-likelihood 2 = -271674.422
-          ... 2140 lines omitted ...
-        } [1.0s, cum. 2.1s]
-      } [2.1s, cum. 2.8s]
+          Sentence 1/497
+          Sentence 2/497
+          Sentence 3/497
+          Log-likelihood 1 = -44052.729
+          Log-likelihood 2 = -39247.139
+          ... 494 lines omitted ...
+        }
+      }
       ... 2 lines omitted ...
-    } [6.6s, cum. 6.6s]
+    } [1.2s, cum. 1.2s]
     Training stage 2: HMM and HMM jointly for 2 iterations {
-      Joint Train: 2143 sentences, jointly {
+      Joint Train: 497 sentences, jointly {
         Iteration 1/2 {
-          Sentence 1/2143
-          Sentence 2/2143
-          Sentence 3/2143
-          Sentence 520/2143
-          Log-likelihood 1 = -233831.426
-          Log-likelihood 2 = -205330.263
-          WARNING: normalize(): observed, (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): evading (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): 30) (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): "au (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): forget. (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): exported (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): extensively (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): decreed (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): equivalent (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): 229/83 (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): prohibited (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): (ex (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): reimporting (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): restrictions, (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): leclerc (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): publisher' (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): osce (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): prior (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): definitive (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): reimported (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): particularly, (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): blé (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): well-grounded (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): vert" (with 96 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): étonner (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): réimportés (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): 30) (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): 1995, (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): contourner (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): conditionnée (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): allouées, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): instaurant (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): interdites (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): lesdits (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): pnb. (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): équivalant (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): jonglant (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): entretenu, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): précisait (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): marchandage, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): l'éditeur, (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): l'arrêt (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): exportés (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): 229/83 (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): réimportation (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): l'affaire (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): sommes, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): (ancien (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): l'importation, (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): récent (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): équivalentes (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): conflit, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): osce (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): édités (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): leclerc/au (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): rédigée (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): accordant (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): l'époque, (with 101 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): définitif (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): vert, (with 101 elements) has sum 0.000000, using uniform
-          ... 2139 lines omitted ...
-        } [6.0s, cum. 6.0s]
+          Sentence 1/497
+          Sentence 2/497
+          Sentence 3/497
+          Log-likelihood 1 = -35029.950
+          Log-likelihood 2 = -31928.086
+          ... 494 lines omitted ...
+        }
         Iteration 2/2 {
-          Sentence 1/2143
-          Sentence 2/2143
-          Sentence 3/2143
-          Log-likelihood 1 = -212622.480
-          Log-likelihood 2 = -178087.429
-          WARNING: normalize(): forget. (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): extensively (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): osce (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): definitive (with 99 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): étonner (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): conditionnée (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): allouées, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): pnb. (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): jonglant (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): entretenu, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): marchandage, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): sommes, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): récent (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): équivalentes (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): conflit, (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): osce (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): accordant (with 49 elements) has sum 0.000000, using uniform
-          WARNING: normalize(): définitif (with 49 elements) has sum 0.000000, using uniform
-          ... 2140 lines omitted ...
-        } [5.3s, cum. 11s]
-      } [11s, cum. 11s]
+          Sentence 1/497
+          Sentence 2/497
+          Sentence 3/497
+          Log-likelihood 1 = -30511.630
+          Log-likelihood 2 = -26854.061
+          ... 494 lines omitted ...
+        }
+      } [1.1s, cum. 1.1s]
       saveParams(output/stage2.1.params) {
         Text
         Binary
@@ -133,8 +53,8 @@ main() {
         Text
         Binary
       }
-    } [12s, cum. 19s]
-  } [19s, cum. 19s]
+    } [1.4s, cum. 2.7s]
+  } [2.7s, cum. 2.9s]
   Evaluating 2 Aligners {
     Testing SoftUnion(HMM:normal,HMM:reversed)@0.500 {
       alignSentencePairs(447 sentences) {
@@ -144,9 +64,9 @@ main() {
         ... 444 lines omitted ...
       }
       Output alignments
-      Unaligned: 1198, 1789
-      A = 6494, S = 4038, A&S = 3642, A&P = 5360
-      Precision = 0.825377, Recall = 0.901932, AER = 0.145272, best AER = 0.145272
+      Unaligned: 1229, 1744
+      A = 6492, S = 4038, A&S = 3461, A&P = 5184
+      Precision = 0.798521, Recall = 0.857107, AER = 0.179012, best AER = 0.179012
     }
     (SoftUnion(HMM:normal,HMM:reversed)@0.500, 0.5) is new max
     Testing CompetitiveThreshold(SoftUnion(HMM:normal,HMM:reversed)@0.500) {
@@ -154,26 +74,23 @@ main() {
         Sentence 0/447
         Sentence 1/447
         Sentence 2/447
-        Sentence 4/447
-        Sentence 8/447
-        ... 442 lines omitted ...
+        ... 444 lines omitted ...
       }
       Output alignments
-      Unaligned: 1484, 2246
-      A = 5719, S = 4038, A&S = 3511, A&P = 4931
-      Precision = 0.862214, Recall = 0.869490, AER = 0.134775, best AER = 0.134775
+      Unaligned: 1479, 2200
+      A = 5751, S = 4038, A&S = 3327, A&P = 4788
+      Precision = 0.832551, Recall = 0.823923, AER = 0.171008, best AER = 0.171008
     }
     (CompetitiveThreshold(SoftUnion(HMM:normal,HMM:reversed)@0.500), 0.5) is new max
     ... 1 lines omitted ...
-  } [1.0s, cum. 20s]
+  } [1.0s, cum. 4.0s]
   Aligning training using aligner CompetitiveThreshold(SoftUnion(HMM:normal,HMM:reversed)@0.500) {
     Writing alignments to output/training {
       Sentence 0
       Sentence 1
       Sentence 2
-      Sentence 485
-      ... 1692 lines omitted ...
-    } [2.2s, cum. 2.3s]
-  } [2.3s, cum. 23s]
+      ... 47 lines omitted ...
+    }
+  }
   Execution directory: output
-} [23s]
+} [4.1s]

@@ -103,10 +103,12 @@ public class KleinBilingualParser extends LexicalizedParser{
         FileFilter secondaryTrainFilter = null;
 
         String alignFile=null;
-        String  bitreebankPathE = null;
+        String  bitrainPathE = null;
         FileFilter bitrainFilterE = null;
-        String  bitreebankPathF = null;
+        String  bitrainPathF = null;
         FileFilter bitrainFilterF = null;
+        Treebank bitrainTreebankF = null;
+        Treebank bitrainTreebankE = null;
 
         // variables needed to process the files to be parsed
         TokenizerFactory<? extends HasWord> tokenizerFactory = null;
@@ -143,7 +145,7 @@ public class KleinBilingualParser extends LexicalizedParser{
                         bitrainF = true;
                         Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-bitrain");
                         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                        bitreebankPathF = treebankDescription.first();
+                        bitrainPathF = treebankDescription.first();
                         bitrainFilterF = treebankDescription.second();
                     }  
                     else if (args[argIndex].equalsIgnoreCase("-tLPP") && (argIndex + 1 < args.length)) {
@@ -198,7 +200,7 @@ public class KleinBilingualParser extends LexicalizedParser{
                         bitrainE = true;
                         Pair<String, FileFilter> treebankDescription = ArgUtils.getTreebankDescription(args, argIndex, "-bitrain");
                         argIndex = argIndex + ArgUtils.numSubArgs(args, argIndex) + 1;
-                        bitreebankPathE = treebankDescription.first();
+                        bitrainPathE = treebankDescription.first();
                         bitrainFilterE = treebankDescription.second();
                     } 
                      else if (args[argIndex].equalsIgnoreCase("-treebank") ||
@@ -245,12 +247,45 @@ public class KleinBilingualParser extends LexicalizedParser{
         lpF = getParserFromTreebank(trainTreebankF, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
         lpE = getParserFromTreebank(trainTreebankE, null, secondaryTreebankWeight, compactorE, eOp, tuneTreebankE, null);
         
-        //GET FRENCH TREEBANK
+
         
         // the following has to go after reading parser to make sure
         // op and tlpParams are the same for train and test
         // THIS IS BUTT UGLY BUT IT STOPS USER SPECIFIED ENCODING BEING
         // OVERWRITTEN BY ONE SPECIFIED IN SERIALIZED PARSER
+        if (encodingF != null) {
+            fOp.tlpParams.setInputEncoding(encodingF);
+            fOp.tlpParams.setOutputEncoding(encodingF);
+        }
+        
+        if (bitrainFilterF != null || bitrainPathF != null) {
+            if (bitrainPathF == null) {
+                //?
+                if (treebankPathF == null) {
+                    throw new RuntimeException("No bitrain treebank path specified...");
+                } else {
+                    log.info("No test treebank path specified.  Using train path: \"" + treebankPathF + '\"');
+                    bitrainPathF = treebankPathF;
+                }
+            }
+            bitrainTreebankF = fOp.tlpParams.testMemoryTreebank();
+            bitrainTreebankF.loadPath(bitrainPathF, bitrainFilterF);
+        }             
+        
+        if (bitrainFilterE != null || bitrainPathE != null) {
+            if (bitrainPathE == null) {
+                if (treebankPathE == null) {
+                    throw new RuntimeException("No test treebank path specified...");
+                } else {
+                    log.info("No test treebank path specified.  Using train path: \"" + treebankPathE + '\"');
+                    bitrainPathE = treebankPathE;
+                }
+            }
+            bitrainTreebankE = eOp.tlpParams.testMemoryTreebank();
+            bitrainTreebankE.loadPath(bitrainPathE, bitrainFilterE);
+        }
+
+        
         if (encodingF != null) {
             fOp.tlpParams.setInputEncoding(encodingF);
             fOp.tlpParams.setOutputEncoding(encodingF);
@@ -271,7 +306,7 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         fOp.trainOptions.sisterSplitters = Generics.newHashSet(Arrays.asList(fOp.tlpParams.sisterSplitters()));
         
-        //GET ENGLISH TREEBANK
+
         
         if (testFilterE != null || testPathE != null) {
             if (testPathE == null) {
@@ -317,14 +352,14 @@ public class KleinBilingualParser extends LexicalizedParser{
         int numFeatures = 7;
         do {
             diff = 0.0;
-            Iterator<Tree> eTrees = testTreebankE.iterator();
-            Iterator<Tree> fTrees = testTreebankF.iterator();
+            Iterator<Tree> eTrees = bitrainTreebankE.iterator();
+            Iterator<Tree> fTrees = bitrainTreebankF.iterator();
             Iterator<HashMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
 
             //features are used in the order they are defined
-            double A[][][][] = new double[testTreebankE.size()][numFeatures][kE][kF];
-            int ePsGold[] = new int[testTreebankE.size()];
-            int fPsGold[] = new int[testTreebankF.size()];
+            double A[][][][] = new double[bitrainTreebankE.size()][numFeatures][kE][kF];
+            int ePsGold[] = new int[bitrainTreebankE.size()];
+            int fPsGold[] = new int[bitrainTreebankF.size()];
             
             int i = 0;
             while(eTrees.hasNext() && fTrees.hasNext() && alignIterator.hasNext()){
@@ -421,12 +456,13 @@ public class KleinBilingualParser extends LexicalizedParser{
 
             System.out.println("Current difference: " + diff);
         }
-        while (diff > 0.0005);
+        while (diff > 0.005);
+
 
         //TESTING BILINGUAL PARSER
 
-        Treebank bilingTestTreebankF = trainTreebankF;
-        Treebank bilingTestTreebankE = trainTreebankE;
+        Treebank bilingTestTreebankF = testTreebankF;
+        Treebank bilingTestTreebankE = testTreebankE;
         Iterator<Tree> eTreesBling = testTreebankE.iterator();
         Iterator<Tree> fTreesBling = testTreebankF.iterator();
 

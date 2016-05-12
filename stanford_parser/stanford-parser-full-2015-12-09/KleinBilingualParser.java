@@ -325,15 +325,16 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         //PARALLEL ALIGNMENT FEATURE CALCULATION, CALCULATION OF 'A' MATRIX
 
-        double[] weights = new double[7];
+        double[] weights = new double[8];
         double diff;
        weights[0] = 0.01;
        weights[1] = -0.002;
        weights[2] = 0.002;
        weights[3] = 0.002;
        weights[4] = 0.002;
-       weights[5] = 0.002;
-       weights[6] = -0.002;
+        weights[5] = 0.002;
+        weights[6] = -0.002;
+        weights[7] = -0.002;
 
 
         ArrayList<HashMap<Integer,ArrayList<Integer>>> alignments=null;
@@ -349,13 +350,15 @@ public class KleinBilingualParser extends LexicalizedParser{
 
         int kE = 10;
         int kF = 10;
-        int numFeatures = 7;
+        int numFeatures = 8;
+        int numBigSentences = 0;
         do {
             diff = 0.0;
             Iterator<Tree> eTrees = bitrainTreebankE.iterator();
             Iterator<Tree> fTrees = bitrainTreebankF.iterator();
             Iterator<HashMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
-
+            numBigSentences = 0;
+            
             //features are used in the order they are defined
             double A[][][][] = new double[bitrainTreebankE.size()][numFeatures][kE][kF];
             int ePsGold[] = new int[bitrainTreebankE.size()];
@@ -363,10 +366,20 @@ public class KleinBilingualParser extends LexicalizedParser{
             
             int i = 0;
             while(eTrees.hasNext() && fTrees.hasNext() && alignIterator.hasNext()){
-
                 HashMap<Integer,ArrayList<Integer>> alignMap = alignIterator.next();
                 Tree fTree = fTrees.next();
                 Tree eTree = eTrees.next();
+                
+                if (fTree.getLeaves().size() > 70 || fTree.getLeaves().size() > 70){
+                    //System.out.println("Too big : " + i);
+                    numBigSentences++;
+                    
+                    fPsGold[i] = 3;
+                    ePsGold[i] = 3;
+                    
+                    i++;
+                    continue;
+                }
                 
                 List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
                 List<? extends HasWord> sentenceE = Sentence.toCoreLabelList(eTree.yieldWords());
@@ -406,13 +419,14 @@ public class KleinBilingualParser extends LexicalizedParser{
                             A[i][4][j][k] += insideBoth(nodeF,nodeE, alignMap);
                             A[i][5][j][k] += insideSrcOutsideTgt(nodeF,nodeE, alignMap);
                             A[i][6][j][k] += insideTgtOutsideSrc(nodeF,nodeE, alignMap);
+                            A[i][7][j][k] += bias(nodeF,nodeE);
                         }
                         
                         k++;
                     }
                     j++;
                 }
-                System.out.println("Sentence " + i);
+                //System.out.println("Sentence " + i);
                 i++;
             }
             
@@ -457,7 +471,7 @@ public class KleinBilingualParser extends LexicalizedParser{
 
             System.out.println("Current difference: " + diff);
         }
-        while (diff > 0.005);
+        while (diff > 0.0005);
 
 
         //TESTING BILINGUAL PARSER
@@ -524,6 +538,7 @@ public class KleinBilingualParser extends LexicalizedParser{
                         currentScore += weights[4]*insideBoth(nodeF,nodeE, alignMap);
                         currentScore += weights[5]*insideSrcOutsideTgt(nodeF,nodeE, alignMap);
                         currentScore += weights[6]*insideTgtOutsideSrc(nodeF,nodeE, alignMap);
+                        currentScore += weights[7]*bias(nodeF,nodeE);
                     }
 
                     if (currentScore > maxScore) {
@@ -557,6 +572,8 @@ public class KleinBilingualParser extends LexicalizedParser{
         System.out.println("------------------------");
         System.out.println("PCFG labeled f1: " + pcfgLBf.getEvalbF1Percent());
         System.out.println("Factored labeled f1: " + factLBf.getEvalbF1Percent());
+        System.out.println("------------------------");
+        System.out.println("Number of sentences too big: " + numBigSentences);
     } // end main
     
     /////////////////////////
@@ -682,6 +699,10 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Intege
 
     return sum/10;
 }
+    
+    private static double bias (Tree nodeF, Tree nodeE){
+        return 1.0;
+    }
 
     
     /////////////////////////
@@ -732,7 +753,10 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Intege
           for (Tree eSubTree : eParseTree){
             if (!eSubTree.isLeaf()){
                 //IF IT GETS TOO SLOW DON'T COMPUTE WORD ALIGNMENT FEATURES FOR LARGE SENTENCES
-              costMatrix[i][j] = weights[2]*spanDiff(fSubTree, eSubTree) + weights[3]*numChildren(fSubTree, eSubTree) + weights[4]*insideBoth(fSubTree,eSubTree, alignMap) + weights[5]*insideSrcOutsideTgt(fSubTree,eSubTree, alignMap) + weights[6]*insideTgtOutsideSrc(fSubTree,eSubTree, alignMap);
+                costMatrix[i][j] = weights[2]*spanDiff(fSubTree, eSubTree) + weights[3]*numChildren(fSubTree, eSubTree) + weights[7]*bias(fSubTree, eSubTree);
+                if (numFrenchNodes < 50 && numEnglishNodes < 50){
+                    costMatrix[i][j] += weights[4]*insideBoth(fSubTree,eSubTree, alignMap) + weights[5]*insideSrcOutsideTgt(fSubTree,eSubTree, alignMap) + weights[6]*insideTgtOutsideSrc(fSubTree,eSubTree, alignMap);
+                }
               costMatrix[i][j] = 0 - costMatrix[i][j];
               j++;
             }

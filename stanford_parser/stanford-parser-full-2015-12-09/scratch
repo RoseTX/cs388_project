@@ -6,3 +6,19 @@ Engilsh
 
 
 java -Xmx6g -cp "stanford-parser.jar:slf4j-api.jar:" KleinBilingualParser -tLPP edu.stanford.nlp.parser.lexparser.FrenchTreebankParserParams -frenchFactored -encoding UTF-8 -train ../../data/europarl/treebanks/french_train_set_noblanks_clean -test ../../data/europarl/treebanks/french_test_set_clean
+
+##############################
+
+pcfg LP/LR summary evalb: LP: 45.53 LR: 51.82 F1: 48.47 Exact: 0.0 N: 20
+dep DA summary evalb: LP: 42.69 LR: 42.69 F1: 42.69 Exact: 0.0 N: 16
+factor LP/LR summary evalb: LP: 43.08 LR: 49.47 F1: 46.06 Exact: 0.0 N: 20
+factor Tag summary evalb: LP: 84.83 LR: 84.83 F1: 84.83 Exact: 0.0 N: 20
+
+pcfg LP/LR summary evalb: LP: 44.95 LR: 48.79 F1: 4
+6.79 Exact: 0.0 N: 20
+dep DA summary evalb: LP: 0.0 LR: 0.0 F1: 0.0 Exact: 0.0 N: 0
+factor LP/LR summary evalb: LP: 44.95 LR: 48.79 F1: 46.79 Exact: 0.0 N: 20
+factor Tag summary evalb: LP: 65.41 LR: 65.41 F1: 65.41 Exact: 0.0 N: 20
+factF1  factDA  factEx  pcfgF1  depDA   factTA  num
+46.80           0.00    46.80           65.41   20
+

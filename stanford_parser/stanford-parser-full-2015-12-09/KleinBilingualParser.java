@@ -288,15 +288,18 @@ public class KleinBilingualParser extends LexicalizedParser{
         
         //PARALLEL ALIGNMENT FEATURE CALCULATION, CALCULATION OF 'A' MATRIX
 
-        double[] weights = new double[4];
+        double[] weights = new double[7];
         double diff;
-       weights[0] = 0.1;
-       weights[1] = -0.2;
-       weights[2] = 0.02;
-       weights[3] = 0.2;
+       weights[0] = 0.01;
+       weights[1] = -0.002;
+       weights[2] = 0.002;
+       weights[3] = 0.002;
+       weights[4] = 0.002;
+       weights[5] = 0.002;
+       weights[6] = -0.002;
 
 
-        ArrayList<TreeMap<Integer,ArrayList<Integer>>> alignments=null;
+        ArrayList<HashMap<Integer,ArrayList<Integer>>> alignments=null;
         //String alignFile="../../berkeleyaligner/output/test.align";
         try{
            
@@ -310,7 +313,7 @@ public class KleinBilingualParser extends LexicalizedParser{
             diff = 0.0;
             Iterator<Tree> eTrees = testTreebankE.iterator();
             Iterator<Tree> fTrees = testTreebankF.iterator();
-            Iterator<TreeMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
+            Iterator<HashMap<Integer,ArrayList<Integer>>> alignIterator = alignments.iterator();
 
             int kE = 10;
             int kF = 10;
@@ -323,7 +326,7 @@ public class KleinBilingualParser extends LexicalizedParser{
             int i = 0;
             while(eTrees.hasNext() && fTrees.hasNext() && alignIterator.hasNext()){
 
-                TreeMap<Integer,ArrayList<Integer>> alignMap = alignIterator.next();
+                HashMap<Integer,ArrayList<Integer>> alignMap = alignIterator.next();
                 Tree fTree = fTrees.next();
                 Tree eTree = eTrees.next();
                 
@@ -348,7 +351,9 @@ public class KleinBilingualParser extends LexicalizedParser{
                 for (ScoredObject<Tree> eScoredObj : kBestE){
                     k = 0;
                     for (ScoredObject<Tree> fScoredObj : kBestF){
-                        HashMap<Tree, Tree> alignment = getHungarianAlignment(eScoredObj.object(), fScoredObj.object(), weights);
+                        eScoredObj.object().setSpans();
+                        fScoredObj.object().setSpans();
+                        HashMap<Tree, Tree> alignment = getHungarianAlignment(eScoredObj.object(), fScoredObj.object(), weights, alignMap);
                         
                         //had to reduce likelihood scores by factor of 10 to keep the optimizer working
                         A[i][0][j][k] = eScoredObj.score()/100;
@@ -357,17 +362,12 @@ public class KleinBilingualParser extends LexicalizedParser{
                         for (Map.Entry entry : alignment.entrySet()){
                             Tree nodeF = (Tree) entry.getKey();
                             Tree nodeE = (Tree) entry.getValue();
-
-                            nodeF.setSpans();
-                            nodeE.setSpans();
-
                             
                             A[i][2][j][k] += spanDiff(nodeF, nodeE);
                             A[i][3][j][k] += numChildren(nodeF, nodeE);
                             A[i][4][j][k] += insideBoth(nodeF,nodeE, alignMap);
                             A[i][5][j][k] += insideSrcOutsideTgt(nodeF,nodeE, alignMap);
                             A[i][6][j][k] += insideTgtOutsideSrc(nodeF,nodeE, alignMap);
-
                         }
                         
                         k++;
@@ -407,16 +407,16 @@ public class KleinBilingualParser extends LexicalizedParser{
             } catch (cc.mallet.optimize.OptimizationException e) {
                 System.out.println(e.getMessage());
             }
-            
-            System.out.println(optimizable.getParameter(0) + ", " + optimizable.getParameter(1) + ", " + optimizable.getParameter(2) + ", " + optimizable.getParameter(3));
 
             for (int x = 0; x < weights.length; x++){
                 diff += (optimizable.getParameter(x) - weights[x])*(optimizable.getParameter(x) - weights[x]);
                 weights[x] = optimizable.getParameter(x);
+                System.out.print(weights[x] + ", ");
             }
+            System.out.println();
             diff /= weights.length;
 
-            System.out.println(diff);
+            System.out.println("Current difference: " + diff);
         }
         while (diff > 0.0005);
 
@@ -452,7 +452,7 @@ public class KleinBilingualParser extends LexicalizedParser{
         }
     }
 
-    private static double insideBoth(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+    private static double insideBoth(Tree nodeF, Tree nodeE, HashMap<Integer,ArrayList<Integer>> alignMap)
 {
   
     IntPair spanF=nodeF.getSpan();
@@ -493,7 +493,7 @@ public class KleinBilingualParser extends LexicalizedParser{
     return sum;
 }
 
-private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, HashMap<Integer,ArrayList<Integer>> alignMap)
 {
   
     IntPair spanF=nodeF.getSpan();
@@ -522,7 +522,7 @@ private static double insideSrcOutsideTgt(Tree nodeF, Tree nodeE, TreeMap<Intege
 }
 
 
-private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Integer,ArrayList<Integer>> alignMap)
+private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, HashMap<Integer,ArrayList<Integer>> alignMap)
 {
   
     IntPair spanF=nodeF.getSpan();
@@ -582,7 +582,7 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Intege
         return alignment;
     }
 
-    private static HashMap<Tree, Tree> getHungarianAlignment(Tree eParseTree, Tree fParseTree, double[] weights){
+    private static HashMap<Tree, Tree> getHungarianAlignment(Tree eParseTree, Tree fParseTree, double[] weights, HashMap<Integer,ArrayList<Integer>> alignMap){
       // remember to ignore the top two weights because they are monolingual features
       int numFrenchNodes = fParseTree.size() - fParseTree.getLeaves().size();
       int numEnglishNodes = eParseTree.size() - eParseTree.getLeaves().size();
@@ -597,7 +597,7 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Intege
           j = 0;
           for (Tree eSubTree : eParseTree){
             if (!eSubTree.isLeaf()){
-              costMatrix[i][j] = weights[2]*spanDiff(fSubTree, eSubTree) + weights[3]*numChildren(fSubTree, eSubTree);
+              costMatrix[i][j] = weights[2]*spanDiff(fSubTree, eSubTree) + weights[3]*numChildren(fSubTree, eSubTree) + weights[4]*insideBoth(fSubTree,eSubTree, alignMap) + weights[5]*insideSrcOutsideTgt(fSubTree,eSubTree, alignMap) + weights[6]*insideTgtOutsideSrc(fSubTree,eSubTree, alignMap);
               j++;
             }
           }
@@ -728,23 +728,17 @@ private static double insideTgtOutsideSrc(Tree nodeF, Tree nodeE, TreeMap<Intege
         
         // The following get/set methods satisfy the Optimizable interface
         
-        public int getNumParameters() { return 4; }
+        public int getNumParameters() { return parameters.length; }
         public double getParameter(int i) { return parameters[i]; }
         public void getParameters(double[] buffer) {
-            buffer[0] = parameters[0];
-            buffer[1] = parameters[1];
-            buffer[2] = parameters[2];
-            buffer[3] = parameters[3];
+            deepArrayCopy(parameters, buffer);
         }
         
         public void setParameter(int i, double r) {
             parameters[i] = r;
         }
         public void setParameters(double[] newParameters) {
-            parameters[0] = newParameters[0];
-            parameters[1] = newParameters[1];
-            parameters[2] = newParameters[2];
-            parameters[3] = newParameters[3];
+            deepArrayCopy(newParameters, parameters);
         }
     }
     

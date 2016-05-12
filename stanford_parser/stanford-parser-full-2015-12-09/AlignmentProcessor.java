@@ -5,12 +5,12 @@ import java.io.*;
 public class AlignmentProcessor {
 
     private String fileName;//alignment file
-    private ArrayList<TreeMap<Integer,ArrayList<Integer>>> frenchtoEnglishIndices;
+    private ArrayList<HashMap<Integer,ArrayList<Integer>>> frenchtoEnglishIndices;
     //frenchtoEnglishIndices[0][1] represents the second word of the first line in French and its corresponding word indice in the englihs sentcence
 
 	public static void main(String[] args) throws FileNotFoundException, IOException{
         AlignmentProcessor p = new AlignmentProcessor(args[0]);
-        ArrayList<TreeMap<Integer,ArrayList<Integer>>> r = p.createAlignments();
+        ArrayList<HashMap<Integer,ArrayList<Integer>>> r = p.createAlignments();
         System.out.println(p.getAlignmentForWord(1,3).get(0));
 
        
@@ -19,10 +19,10 @@ public class AlignmentProcessor {
     public AlignmentProcessor(String f)
     {
         this.fileName=f;
-        this.frenchtoEnglishIndices=new ArrayList<TreeMap<Integer,ArrayList<Integer>>>();
+        this.frenchtoEnglishIndices=new ArrayList<HashMap<Integer,ArrayList<Integer>>>();
     }
 
-    public ArrayList<TreeMap<Integer,ArrayList<Integer>>> createAlignments () throws FileNotFoundException, IOException{//synchronously removes empty blank lines
+    public ArrayList<HashMap<Integer,ArrayList<Integer>>> createAlignments () throws FileNotFoundException, IOException{//synchronously removes empty blank lines
 
         //data_dir should point to the file.
         BufferedReader align_data = new BufferedReader(new FileReader(this.fileName));
@@ -34,7 +34,7 @@ public class AlignmentProcessor {
             int numWords=pairs.length;
             //System.out.println(numWords);
 
-            TreeMap<Integer,ArrayList<Integer>> align = new TreeMap<Integer,ArrayList<Integer>>();
+            HashMap<Integer,ArrayList<Integer>> align = new HashMap<Integer,ArrayList<Integer>>();
             for(String word:pairs)
             {
 

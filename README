@@ -1,2 +1,40 @@
-Rose Simmons and Eddy Hudson
-CS 388 Project
+CS 388 Final Project Spring 2016
+Eddy Hudson EID: eh25256
+Rose Simmons EID: rjs3222
+
+Project:
+Inter-Language Domain Adaptation
+
+Data Sets:
+Europarl:
+http://www.statmt.org/europarl/ 
+JRCAcquis:
+https://ec.europa.eu/jrc/en/language-technologies/jrc-acquis
+Europarl (gold standard trees):
+https://www.rocq.inria.fr/alpage-wiki/tiki-index.php?page=CorpusSequoia
+
+Below is the directory structure with the most relevant files pointed out and briefly explained.
+
+-berkeleyAligner/ (used to create word alignments)
+-berkeleyparser-master/
+-data/
+	-europarl/ 
+		-raw/ (raw inputs for train,bilingual train, test)
+		-treebanks/ (parsed syntactic trees from raw inputs)
+	-jrcacquis/
+		-raw/
+		-treebanks/
+	-preprocessing/
+		-AlignmentProcessor.java (parses word alignments)
+		-PreProcessor.java (removes blank lines, etc)
+-mallet/
+-stanford_parser/ 
+	-stanford-parser-full-2015-12-09/
+		...
+		-EddyRoseDomainAdaptation.java (incorporates domain adaptation)
+		-HungarianAlgorithm.java (optimization/)
+		-KleinBilingualParser.java (Main file for running experiments with parser, implemented ourselves but ideas from Klein)
+		...
+
+Example run of EddyRoseDomainAdaptation with all options:
+java -Xmx6g -cp "stanford-parser.jar:slf4j-api.jar:mallet.jar:mallet-deps.jar:" EddyRoseDomainAdaptation -tLPP edu.stanford.nlp.parser.lexparser.FrenchTreebankParserParams -frenchFactored -encoding UTF-8 -train ../../data/jrcacquis/treebanks/split-1000-500-200/french_train_1000  -test ../../data/europarl/treebanks/split-1000-500-200/french_train_1000  -bitrain ../../data/jrcacquis/treebanks/split-1000-500-200/french_bitrain_500 -- -evals "tsv" -goodPCFG -train ../../data/jrcacquis/treebanks/split-1000-500-200/english_train_1000  -testTreebank ../../data/europarl/treebanks/split-1000-500-200/english_train_1000 -bitrain ../../data/jrcacquis/treebanks/split-1000-500-200/english_bitrain_500  -trainAlignFile ../../data/jrcacquis/alignments/bitrain_500 -testAlignFile ../../data/europarl/alignments/train_1000 -seqtest ../../data/Europar.281.test

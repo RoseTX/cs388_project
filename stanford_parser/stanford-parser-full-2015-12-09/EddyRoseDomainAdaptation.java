@@ -354,37 +354,35 @@ public class EddyRoseDomainAdaptation extends LexicalizedParser{
         //
         //////////////////////
 
-        // MemoryTreebank selfTrainInitTreebank = new MemoryTreebank();
-        // MemoryTreebank selfTrainFinalTreebank = new MemoryTreebank();
+         MemoryTreebank selfTrainInitTreebank = new MemoryTreebank();
+         MemoryTreebank selfTrainFinalTreebank = new MemoryTreebank();
 
-        // selfTrainInitTreebank.addAll(trainTreebankF);
-        // selfTrainInitTreebank.addAll(bitrainTreebankF);
-        // selfTrainFinalTreebank.addAll(trainTreebankF);
-        // selfTrainFinalTreebank.addAll(bitrainTreebankF);
+         selfTrainInitTreebank.addAll(trainTreebankF);
+         selfTrainFinalTreebank.addAll(trainTreebankF);
 
-        // LexicalizedParser fSelfTrainInit = getParserFromTreebank(selfTrainInitTreebank, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
+         LexicalizedParser fSelfTrainInit = getParserFromTreebank(selfTrainInitTreebank, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
 
-        // int z = 0;
-        // boolean runningAveragesF = Boolean.parseBoolean(fOp.testOptions.evals.getProperty("runningAverages"));
-        // AbstractEval factLBf = new Evalb("factor LP/LR", runningAveragesF);
+         int z = 0;
+         boolean runningAveragesF = Boolean.parseBoolean(fOp.testOptions.evals.getProperty("runningAverages"));
+         AbstractEval factLBf = new Evalb("factor LP/LR", runningAveragesF);
 
-        // for (Tree goldTree : testTreebankF) {
-        //     List<? extends HasWord> sentence = Sentence.toCoreLabelList(goldTree.yieldWords());
-        //     Tree guessTree = fSelfTrainInit.parseTree(sentence);
-        //     selfTrainFinalTreebank.add(guessTree);
-        //     factLBf.evaluate(guessTree, goldTree);
-        //     System.out.println("Self-training : " + (++z));
-        // }
+         for (Tree goldTree : testTreebankF) {
+             List<? extends HasWord> sentence = Sentence.toCoreLabelList(goldTree.yieldWords());
+             Tree guessTree = fSelfTrainInit.parseTree(sentence);
+             selfTrainFinalTreebank.add(guessTree);
+             factLBf.evaluate(guessTree, goldTree);
+             System.out.println("Self-training : " + (++z));
+         }
 
-        // LexicalizedParser fSelfTrainFinal = getParserFromTreebank(selfTrainFinalTreebank, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
-        // EvaluateTreebank evaluatorH = new EvaluateTreebank(fSelfTrainFinal);
-        // double scoreF1 = evaluatorH.testOnTreebank(seqTestTreebank));
+         LexicalizedParser fSelfTrainFinal = getParserFromTreebank(selfTrainFinalTreebank, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
+         EvaluateTreebank evaluatorH = new EvaluateTreebank(fSelfTrainFinal);
+         double scoreF1 = evaluatorH.testOnTreebank(seqTestTreebank);
 
-        // System.out.println("------------------------");
-        // System.out.println("    Self Train Results  ");
-        // System.out.println("------------------------");
-        // System.out.println("Test set F1: " + scoreF1;
-        // System.out.println("F1 on projected training data: " + factLBf.getEvalbF1Percent());
+         System.out.println("------------------------");
+         System.out.println("    Self Train Results  ");
+         System.out.println("------------------------");
+         System.out.println("Test set F1: " + scoreF1);
+         System.out.println("F1 on projected training data: " + factLBf.getEvalbF1Percent());
 
         //////////////////////
         //////////////////////
@@ -549,8 +547,7 @@ public class EddyRoseDomainAdaptation extends LexicalizedParser{
         //assumes the 'test' data from KleinBilingualParser.java is the unannotated data
         //that the reranker has to annotate.
         
-        boolean runningAveragesF = Boolean.parseBoolean(fOp.testOptions.evals.getProperty("runningAverages"));
-        AbstractEval factLBf = new Evalb("factor LP/LR", runningAveragesF);
+        factLBf = new Evalb("factor LP/LR", runningAveragesF);
         MemoryTreebank eddyRoseFullTrainTreebank = new MemoryTreebank();
         eddyRoseFullTrainTreebank.addAll(trainTreebankF);
         eddyRoseFullTrainTreebank.addAll(bitrainTreebankF);
@@ -569,7 +566,7 @@ public class EddyRoseDomainAdaptation extends LexicalizedParser{
             Tree eTree = eTreesBling.next();
 
             List<? extends HasWord> sentenceF = Sentence.toCoreLabelList(fTree.yieldWords());
-            LexicalizedParserQuery lpqF = (LexicalizedParserQuery) lpF.parserQuery();
+            LexicalizedParserQuery lpqF = (LexicalizedParserQuery) fSelfTrainFinal.parserQuery();
             lpqF.parse(sentenceF);
             List<ScoredObject<Tree>> kBestF = lpqF.getKBestPCFGParses(kF);
 
@@ -612,8 +609,8 @@ public class EddyRoseDomainAdaptation extends LexicalizedParser{
             i++;
 
             System.out.println("Reranker " + i);
-            eddyRoseFullTrainTreebank.add(kBestF.get(0).object());
-            factLBf.evaluate(kBestF.get(0).object(), fTree);
+            eddyRoseFullTrainTreebank.add(bestFtree);
+            factLBf.evaluate(bestFtree, fTree);
         }
 
         LexicalizedParser lpEddyRose = getParserFromTreebank(eddyRoseFullTrainTreebank, null, secondaryTreebankWeight, compactorF, fOp, tuneTreebankF, null);
